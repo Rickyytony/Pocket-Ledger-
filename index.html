@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pocket Ledger</title>
+<meta name="theme-color" content="#145340">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+:root{
+  --bg:#f4f6f3; --surface:#ffffff; --surface2:#eef2ed; --ink:#17201b; --muted:#5f6b64;
+  --line:#dde3dc; --brand:#145340; --brand-ink:#ffffff; --accent:#c98a1c; --good:#2f7d4f;
+  --warn:#b8741a; --bad:#b33a2f; --bar:#d7e2d9;
+  --csp:#1d4f91; --savor:#a33a2a;
+  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1512; --surface:#18201c; --surface2:#1f2924; --ink:#e7ede9; --muted:#9aa8a0;
+    --line:#2b3631; --brand:#3fa37a; --brand-ink:#08130e; --accent:#e3a843; --good:#55b97f;
+    --warn:#e0a24a; --bad:#e2685c; --bar:#2c3832; --csp:#6c9be0; --savor:#e07a68;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+.num{font-variant-numeric:tabular-nums}
+header{position:sticky;top:0;z-index:5;background:var(--bg);
+  padding:calc(10px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:10px}
+header h1{font-size:22px;margin:0;flex:1;letter-spacing:-.01em}
+.monthnav{display:flex;align-items:center;gap:4px}
+.monthnav span{min-width:92px;text-align:center;font-weight:600;font-size:15px}
+.iconbtn{border:0;background:var(--surface2);color:var(--ink);width:34px;height:34px;border-radius:50%;
+  font-size:18px;line-height:1;cursor:pointer}
+main{max-width:720px;margin:0 auto;padding:0 16px}
+section.view{display:none}
+section.view.active{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;margin:0 0 12px;box-shadow:var(--shadow)}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;font-weight:600}
+.big{font-size:32px;font-weight:700;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:14px}
+.row{display:flex;align-items:center;gap:10px}
+.spread{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bar{height:8px;background:var(--bar);border-radius:99px;overflow:hidden;margin-top:6px}
+.bar > i{display:block;height:100%;background:var(--good);border-radius:99px}
+.bar.warn > i{background:var(--warn)} .bar.over > i{background:var(--bad)}
+.budget-row{padding:10px 0;border-top:1px solid var(--line)}
+.budget-row:first-of-type{border-top:0;padding-top:0}
+.over-text{color:var(--bad)}
+.list .item{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.list .item:first-child{border-top:0}
+.dot{width:36px;height:36px;border-radius:10px;background:var(--surface2);display:grid;place-items:center;font-size:18px;flex:none}
+.item .main{flex:1;min-width:0}
+.item .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .meta{font-size:13px;color:var(--muted)}
+.item .amt{text-align:right;font-weight:600}
+.item .amt small{display:block;font-weight:500;font-size:12px}
+.pill{display:inline-block;font-size:12px;padding:1px 7px;border-radius:99px;background:var(--surface2);color:var(--muted)}
+.pill.csp{color:var(--csp)} .pill.savor{color:var(--savor)}
+.daylabel{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 2px}
+.empty{color:var(--muted);text-align:center;padding:24px 8px}
+label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+input,select,textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--surface2);
+  border:1px solid var(--line);border-radius:10px;padding:11px 12px;appearance:none;-webkit-appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+input:focus,select:focus{outline:2px solid var(--brand);outline-offset:0}
+.amount-input{font-size:30px;font-weight:700;text-align:center;padding:12px}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:700;cursor:pointer;
+  background:var(--brand);color:var(--brand-ink);margin-top:14px}
+.btn.secondary{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+.hint{font-size:13px;color:var(--muted);margin-top:6px;min-height:1em}
+.earnpreview{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);font-size:14px}
+.earnpreview b{color:var(--ink)}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);
+  display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;font-weight:600;
+  padding:4px 0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+nav.tabs button .ic{font-size:21px;line-height:1}
+nav.tabs button.active{color:var(--brand)}
+nav.tabs button.add .ic{background:var(--brand);color:var(--brand-ink);width:44px;height:44px;border-radius:50%;
+  display:grid;place-items:center;font-size:26px;margin-top:-18px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;display:none}
+.sheet-bg.open{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-radius:18px 18px 0 0;
+  max-height:92vh;overflow:auto;padding:14px 16px calc(20px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .22s ease;max-width:720px;margin:0 auto}
+.sheet.open{transform:none}
+.sheet .grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 10px}
+.sheet h3{margin:0 0 4px;font-size:19px}
+.banner{background:color-mix(in srgb,var(--accent) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));
+  border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px;display:flex;gap:10px;align-items:center}
+.banner button{margin-left:auto;border:0;background:var(--accent);color:#1b1305;font-weight:700;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;font-weight:700}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.rewardcard{border-left:4px solid var(--csp)}
+.rewardcard.savor{border-left-color:var(--savor)}
+table.rates{width:100%;border-collapse:collapse;font-size:14px}
+table.rates td{padding:7px 0;border-top:1px solid var(--line);vertical-align:middle}
+table.rates tr:first-child td{border-top:0}
+table.rates td.r{text-align:right;white-space:nowrap}
+table.rates input{width:70px;padding:6px 8px;text-align:right;font-size:15px}
+.seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:600;padding:7px;border-radius:8px;cursor:pointer}
+.seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.search{margin-bottom:10px}
+.small{font-size:13px}
+a{color:var(--brand)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="viewTitle">Overview</h1>
+  <div class="monthnav" id="monthNav">
+    <button class="iconbtn" id="prevMonth" aria-label="Previous month">‹</button>
+    <span id="monthLabel" class="num"></span>
+    <button class="iconbtn" id="nextMonth" aria-label="Next month">›</button>
+  </div>
+</header>
+
+<main>
+  <!-- OVERVIEW -->
+  <section class="view active" id="view-overview">
+    <div id="syncBanner"></div>
+    <div class="card">
+      <h2>Spent this month</h2>
+      <div class="big num" id="ovSpent">$0</div>
+      <div class="sub num" id="ovBudgetLine"></div>
+      <div class="bar" id="ovBar"><i style="width:0"></i></div>
+    </div>
+    <div class="grid2">
+      <div class="card rewardcard"><h2>Sapphire pts</h2><div class="big num" id="ovCsp" style="font-size:24px">0</div><div class="sub num" id="ovCspVal"></div></div>
+      <div class="card rewardcard savor"><h2>Savor cash back</h2><div class="big num" id="ovSavor" style="font-size:24px">$0</div><div class="sub">this month</div></div>
+    </div>
+    <div class="card">
+      <div class="spread"><h2>Budgets</h2><a href="#" data-goto="budgets" class="small">Edit</a></div>
+      <div id="ovBudgets"></div>
+    </div>
+    <div class="card">
+      <div class="spread"><h2>Recent</h2><a href="#" data-goto="expenses" class="small">See all</a></div>
+      <div class="list" id="ovRecent"></div>
+    </div>
+  </section>
+
+  <!-- EXPENSES -->
+  <section class="view" id="view-expenses">
+    <input class="search" id="search" type="search" placeholder="Search merchant or note">
+    <div class="card"><div class="spread"><span class="sub">Total shown</span><b class="num" id="expTotal">$0</b></div></div>
+    <div id="expList"></div>
+  </section>
+
+  <!-- BUDGETS -->
+  <section class="view" id="view-budgets">
+    <div class="card">
+      <h2>Monthly budgets</h2>
+      <p class="sub" style="margin:0 0 6px">Set a monthly limit for any category. Leave blank for no budget. These repeat every month.</p>
+      <div id="budgetEditor"></div>
+      <div class="spread" style="margin-top:12px"><b>Total budget</b><b class="num" id="budgetTotal">$0</b></div>
+    </div>
+  </section>
+
+  <!-- REWARDS -->
+  <section class="view" id="view-rewards">
+    <div class="seg" id="rewardRange">
+      <button data-r="month" class="active">This month</button>
+      <button data-r="year">This year</button>
+      <button data-r="all">All time</button>
+    </div>
+    <div id="rewardCards"></div>
+    <div class="card">
+      <h2>Which card should I use?</h2>
+      <div id="bestCard"></div>
+    </div>
+    <div class="card">
+      <h2>Earning rates</h2>
+      <p class="sub" style="margin:0 0 8px">Pre-filled with each card's published rates as of Oct 2026. If a card changes its terms, edit the numbers here. Past expenses keep the rate they earned.</p>
+      <div id="rateEditor"></div>
+      <label for="cppInput">Value of 1 Sapphire point (cents)</label>
+      <input id="cppInput" type="number" step="0.05" min="0" inputmode="decimal">
+      <div class="hint">1.0¢ is the cash-out value. Transfers to airline/hotel partners can be worth more.</div>
+    </div>
+  </section>
+
+  <!-- SYNC -->
+  <section class="view" id="view-sync">
+    <div class="card">
+      <h2>Move data between devices</h2>
+      <p class="sub" style="margin-top:0">Export on the device with your newest entries, send the file to your other device (AirDrop, iCloud Drive, or email), then Import it there. Importing <b>merges</b>: new entries are added, edits and deletions are carried over, and nothing is duplicated.</p>
+      <button class="btn" id="exportBtn">Export data</button>
+      <button class="btn secondary" id="importBtn">Import data</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <div class="hint" id="syncStatus"></div>
+    </div>
+    <div class="card">
+      <h2>About your data</h2>
+      <p class="sub" style="margin:0">Everything is stored privately on this device only, nothing is sent anywhere. Your export file also works as a backup, so keep a recent one somewhere safe.</p>
+      <p class="sub num" id="dataStats"></p>
+      <button class="btn danger" id="wipeBtn">Erase all data on this device</button>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-view="overview" class="active"><span class="ic">⌂</span>Overview</button>
+  <button data-view="expenses"><span class="ic">☰</span>Expenses</button>
+  <button class="add" id="addBtn" aria-label="Add expense"><span class="ic">+</span>Add</button>
+  <button data-view="rewards"><span class="ic">★</span>Rewards</button>
+  <button data-view="sync"><span class="ic">⇅</span>Sync</button>
+</nav>
+
+<!-- Expense sheet -->
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <div class="grab"></div>
+  <h3 id="sheetTitle">Add expense</h3>
+  <form id="expForm" autocomplete="off">
+    <input id="fAmount" class="amount-input num" type="text" inputmode="decimal" placeholder="$0.00" required>
+    <label for="fMerchant">Merchant</label>
+    <input id="fMerchant" type="text" placeholder="e.g. Trader Joe's" list="merchantList">
+    <datalist id="merchantList"></datalist>
+    <div class="grid2">
+      <div><label for="fCategory">Category</label><select id="fCategory"></select></div>
+      <div><label for="fDate">Date</label><input id="fDate" type="date" required></div>
+    </div>
+    <label for="fCard">Paid with</label>
+    <select id="fCard"></select>
+    <div id="earnWrap">
+      <label for="fEarn">Rewards category</label>
+      <select id="fEarn"></select>
+      <div class="hint" id="earnHint"></div>
+    </div>
+    <div class="earnpreview" id="earnPreview"></div>
+    <label for="fNote">Note (optional)</label>
+    <input id="fNote" type="text" placeholder="">
+    <button class="btn" type="submit" id="saveBtn">Save</button>
+    <button class="btn danger" type="button" id="deleteBtn" hidden>Delete expense</button>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ---------- Constants ---------- */
+const STORE_KEY = "pocketLedger.v1";
+const APP_ID = "pocket-ledger";
+
+const CATEGORIES = [
+  {id:"dining", name:"Dining & Takeout", ic:"🍽"},
+  {id:"groceries", name:"Groceries", ic:"🛒"},
+  {id:"transport", name:"Subway, Rideshare & Transit", ic:"🚇"},
+  {id:"gas", name:"Gas & EV Charging", ic:"⛽"},
+  {id:"travel", name:"Travel", ic:"✈"},
+  {id:"entertainment", name:"Entertainment", ic:"🎟"},
+  {id:"streaming", name:"Streaming", ic:"📺"},
+  {id:"shopping", name:"Shopping", ic:"🛍"},
+  {id:"rent", name:"Rent & Housing", ic:"🏠"},
+  {id:"bills", name:"Bills & Utilities", ic:"💡"},
+  {id:"school", name:"School & Books", ic:"📚"},
+  {id:"health", name:"Health & Fitness", ic:"🩺"},
+  {id:"personal", name:"Personal Care", ic:"✂"},
+  {id:"gifts", name:"Gifts & Donations", ic:"🎁"},
+  {id:"other", name:"Other", ic:"•"}
+];
+const catById = Object.fromEntries(CATEGORIES.map(c=>[c.id,c]));
+
+/* Rewards: type "points" -> rate is points per $; type "cash" -> rate is % cash back */
+const DEFAULT_CARDS = {
+  csp: {
+    id:"csp", name:"Chase Sapphire Preferred", short:"Sapphire", type:"points", unit:"pts",
+    earn:[
+      {key:"chase_travel", label:"Travel booked via Chase Travel", rate:5},
+      {key:"lyft", label:"Lyft rides", rate:5, note:"Through Sep 30, 2027"},
+      {key:"peloton", label:"Peloton equipment over $150", rate:5, note:"Through Dec 31, 2027"},
+      {key:"dining", label:"Dining, takeout & delivery", rate:3},
+      {key:"gas", label:"Gas & EV charging", rate:3},
+      {key:"streaming", label:"Select streaming services", rate:3},
+      {key:"online_grocery", label:"Online grocery", rate:3, note:"Excludes Target, Walmart & wholesale clubs"},
+      {key:"vacation_rental", label:"Vacation rentals (Airbnb, Vrbo)", rate:3},
+      {key:"travel", label:"Other travel (subway, Uber, flights, hotels, parking)", rate:2},
+      {key:"other", label:"Everything else", rate:1}
+    ],
+    defaults:{dining:"dining", gas:"gas", streaming:"streaming", transport:"travel", travel:"travel"}
+  },
+  savor: {
+    id:"savor", name:"Capital One Savor", short:"Savor", type:"cash", unit:"%",
+    earn:[
+      {key:"c1_entertainment", label:"Capital One Entertainment tickets", rate:8},
+      {key:"c1_travel", label:"Hotels, rentals & cars via Capital One Travel", rate:5},
+      {key:"dining", label:"Dining", rate:3},
+      {key:"grocery", label:"Grocery stores", rate:3, note:"Excludes superstores like Walmart & Target"},
+      {key:"entertainment", label:"Entertainment (movies, concerts, sports, etc.)", rate:3},
+      {key:"streaming", label:"Popular streaming services", rate:3},
+      {key:"other", label:"Everything else", rate:1}
+    ],
+    defaults:{dining:"dining", groceries:"grocery", entertainment:"entertainment", streaming:"streaming"}
+  }
+};
+const PAY_OTHER = [{id:"debit", name:"Debit card / Cash"}, {id:"othercard", name:"Other card"}];
+
+/* ---------- State & storage ---------- */
+function now(){ return Date.now(); }
+function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2))); }
+
+function emptyState(){
+  return {
+    deviceId: uid(),
+    expenses:{},          // id -> {id, amount, date, category, card, earnKey, rate, merchant, note, updatedAt, deleted}
+    budgets:{},           // categoryId -> {id, amount, updatedAt}
+    cards:{},             // cardId -> {id, earn:[{key,rate}], updatedAt}  (overrides of default rates)
+    settings:{ cpp:{id:"cpp", value:1.0, updatedAt:0} },
+    meta:{ lastExport:0, lastImport:0, changedSinceExport:false }
+  };
+}
+let state = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return emptyState();
+    const s = JSON.parse(raw);
+    const base = emptyState();
+    return {...base, ...s, settings:{...base.settings, ...(s.settings||{})}, meta:{...base.meta, ...(s.meta||{})}};
+  }catch(e){ console.warn(e); return emptyState(); }
+}
+function save(markChanged=true){
+  if(markChanged) state.meta.changedSinceExport = true;
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  catch(e){ toast("Couldn't save on this device. Export a backup now."); }
+}
+if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
+
+/* ---------- Card helpers ---------- */
+function getCard(id){
+  const d = DEFAULT_CARDS[id]; if(!d) return null;
+  const o = state.cards[id];
+  if(!o) return d;
+  const rates = Object.fromEntries((o.earn||[]).map(e=>[e.key,e.rate]));
+  return {...d, earn:d.earn.map(e=>({...e, rate: rates[e.key] ?? e.rate}))};
+}
+function earnOf(cardId, key){
+  const c = getCard(cardId); if(!c) return null;
+  return c.earn.find(e=>e.key===key) || c.earn.find(e=>e.key==="other");
+}
+function defaultEarnKey(cardId, catId){
+  const c = DEFAULT_CARDS[cardId]; if(!c) return null;
+  return c.defaults[catId] || "other";
+}
+function cpp(){ return Number(state.settings.cpp?.value ?? 1); }
+/* Reward earned by an expense: {points} for csp, {cash} dollars for savor */
+function rewardOf(x){
+  const c = DEFAULT_CARDS[x.card]; if(!c) return null;
+  const amt = Number(x.amount)||0, rate = Number(x.rate)||0;
+  if(c.type==="points") return {card:c.id, points: amt*rate, value: amt*rate*cpp()/100};
+  return {card:c.id, cash: amt*rate/100, value: amt*rate/100};
+}
+
+/* ---------- Formatting ---------- */
+const fmt$ = (n, cents=true) => (n<0?"-":"") + "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:cents?2:0, maximumFractionDigits:cents?2:0});
+const fmtPts = n => Math.round(n).toLocaleString("en-US");
+const pad = n => String(n).padStart(2,"0");
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function monthKey(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
+function monthLabel(key){ const [y,m]=key.split("-").map(Number); return new Date(y,m-1,1).toLocaleDateString("en-US",{month:"short",year:"numeric"}); }
+function dayLabel(ds){
+  const [y,m,d]=ds.split("-").map(Number); const dt=new Date(y,m-1,d);
+  if(ds===todayStr()) return "Today";
+  const yst=new Date(); yst.setDate(yst.getDate()-1);
+  if(ds===`${yst.getFullYear()}-${pad(yst.getMonth()+1)}-${pad(yst.getDate())}`) return "Yesterday";
+  return dt.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function parseAmount(s){ const n = parseFloat(String(s).replace(/[^0-9.\-]/g,"")); return isFinite(n)?Math.round(n*100)/100:NaN; }
+
+/* ---------- Selectors ---------- */
+let curMonth = monthKey(new Date());
+let curView = "overview";
+let rewardRange = "month";
+function liveExpenses(){ return Object.values(state.expenses).filter(x=>!x.deleted); }
+function expensesInMonth(mk){ return liveExpenses().filter(x=>x.date.startsWith(mk)); }
+function budgetOf(cat){ const b=state.budgets[cat]; return b && !b.deleted && b.amount>0 ? b.amount : 0; }
+
+/* ---------- Rendering ---------- */
+function render(){
+  document.getElementById("monthLabel").textContent = monthLabel(curMonth);
+  document.getElementById("monthNav").style.visibility = (curView==="overview"||curView==="expenses") ? "visible":"hidden";
+  if(curView==="overview") renderOverview();
+  if(curView==="expenses") renderExpenses();
+  if(curView==="budgets") renderBudgets();
+  if(curView==="rewards") renderRewards();
+  if(curView==="sync") renderSync();
+}
+
+function itemHTML(x){
+  const c = catById[x.category]||catById.other;
+  const r = rewardOf(x);
+  let rw = "";
+  if(r && r.points!==undefined) rw = `<small style="color:var(--csp)">+${fmtPts(r.points)} pts</small>`;
+  else if(r) rw = `<small style="color:var(--savor)">+${fmt$(r.cash)}</small>`;
+  const card = DEFAULT_CARDS[x.card] ? `<span class="pill ${x.card}">${DEFAULT_CARDS[x.card].short}</span>` : "";
+  return `<div class="item" data-id="${x.id}">
+    <div class="dot">${c.ic}</div>
+    <div class="main"><div class="title">${esc(x.merchant || c.name)}</div>
+      <div class="meta">${esc(c.name)} ${card}</div></div>
+    <div class="amt num">${fmt$(x.amount)}${rw}</div></div>`;
+}
+
+function renderOverview(){
+  const xs = expensesInMonth(curMonth);
+  const spent = xs.reduce((a,x)=>a+x.amount,0);
+  const totalBudget = CATEGORIES.reduce((a,c)=>a+budgetOf(c.id),0);
+  document.getElementById("ovSpent").textContent = fmt$(spent);
+  const bar = document.getElementById("ovBar");
+  if(totalBudget>0){
+    const pct = spent/totalBudget;
+    document.getElementById("ovBudgetLine").innerHTML = spent<=totalBudget
+      ? `${fmt$(totalBudget-spent)} left of ${fmt$(totalBudget,false)} budget`
+      : `<span class="over-text">${fmt$(spent-totalBudget)} over</span> your ${fmt$(totalBudget,false)} budget`;
+    bar.style.display=""; bar.className = "bar" + (pct>1?" over":pct>.85?" warn":"");
+    bar.firstElementChild.style.width = Math.min(100,pct*100)+"%";
+  } else {
+    document.getElementById("ovBudgetLine").innerHTML = `No budgets set yet. <a href="#" data-goto="budgets">Set budgets</a>`;
+    bar.style.display="none";
+  }
+  let pts=0, cash=0;
+  xs.forEach(x=>{ const r=rewardOf(x); if(!r) return; if(r.points!==undefined) pts+=r.points; else cash+=r.cash; });
+  document.getElementById("ovCsp").textContent = fmtPts(pts);
+  document.getElementById("ovCspVal").textContent = `≈ ${fmt$(pts*cpp()/100)} value`;
+  document.getElementById("ovSavor").textContent = fmt$(cash);
+
+  // budgets
+  const byCat = {}; xs.forEach(x=>byCat[x.category]=(byCat[x.category]||0)+x.amount);
+  const rows = CATEGORIES.filter(c=>budgetOf(c.id)>0 || byCat[c.id])
+    .sort((a,b)=>(byCat[b.id]||0)-(byCat[a.id]||0))
+    .map(c=>{
+      const s=byCat[c.id]||0, b=budgetOf(c.id);
+      if(!b) return `<div class="budget-row"><div class="spread"><span>${c.ic} ${c.name}</span><span class="num">${fmt$(s)} <span class="sub">no budget</span></span></div></div>`;
+      const pct=s/b;
+      return `<div class="budget-row"><div class="spread"><span>${c.ic} ${c.name}</span>
+        <span class="num ${pct>1?"over-text":""}">${fmt$(s)} <span class="sub">/ ${fmt$(b,false)}</span></span></div>
+        <div class="bar ${pct>1?"over":pct>.85?"warn":""}"><i style="width:${Math.min(100,pct*100)}%"></i></div></div>`;
+    });
+  document.getElementById("ovBudgets").innerHTML = rows.join("") || `<div class="empty">Nothing yet this month.</div>`;
+  const recent = xs.sort((a,b)=>b.date.localeCompare(a.date)||b.updatedAt-a.updatedAt).slice(0,5);
+  document.getElementById("ovRecent").innerHTML = recent.map(itemHTML).join("") || `<div class="empty">Tap + to log your first expense.</div>`;
+  renderSyncBanner();
+}
+
+function renderExpenses(){
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  let xs = expensesInMonth(curMonth);
+  if(q) xs = xs.filter(x=>(x.merchant+" "+x.note+" "+(catById[x.category]?.name||"")).toLowerCase().includes(q));
+  xs.sort((a,b)=>b.date.localeCompare(a.date)||b.updatedAt-a.updatedAt);
+  document.getElementById("expTotal").textContent = fmt$(xs.reduce((a,x)=>a+x.amount,0));
+  if(!xs.length){ document.getElementById("expList").innerHTML = `<div class="card empty">No expenses ${q?"match your search":"this month"}.</div>`; return; }
+  const groups = {}; xs.forEach(x=>(groups[x.date]=groups[x.date]||[]).push(x));
+  document.getElementById("expList").innerHTML = Object.keys(groups).map(d=>
+    `<div class="daylabel">${dayLabel(d)}</div><div class="card list" style="padding-top:4px;padding-bottom:4px">${groups[d].map(itemHTML).join("")}</div>`).join("");
+}
+
+function renderBudgets(){
+  const el = document.getElementById("budgetEditor");
+  el.innerHTML = CATEGORIES.map(c=>`<div class="spread" style="padding:6px 0;border-top:1px solid var(--line)">
+      <span>${c.ic} ${c.name}</span>
+      <input data-budget="${c.id}" class="num" type="number" inputmode="decimal" min="0" step="1" placeholder="—" value="${budgetOf(c.id)||""}" style="width:110px;text-align:right;padding:8px 10px">
+    </div>`).join("");
+  updateBudgetTotal();
+}
+function updateBudgetTotal(){
+  document.getElementById("budgetTotal").textContent = fmt$(CATEGORIES.reduce((a,c)=>a+budgetOf(c.id),0), false);
+}
+
+function inRange(x){
+  if(rewardRange==="all") return true;
+  if(rewardRange==="year") return x.date.startsWith(String(new Date().getFullYear()));
+  return x.date.startsWith(monthKey(new Date()));
+}
+function renderRewards(){
+  const xs = liveExpenses().filter(inRange);
+  const html = ["csp","savor"].map(id=>{
+    const card = getCard(id);
+    const mine = xs.filter(x=>x.card===id);
+    const spend = mine.reduce((a,x)=>a+x.amount,0);
+    const byEarn = {};
+    mine.forEach(x=>{ const r=rewardOf(x); const k=x.earnKey; byEarn[k]=byEarn[k]||{spend:0,amt:0}; byEarn[k].spend+=x.amount; byEarn[k].amt+= r.points!==undefined? r.points : r.cash; });
+    let total = 0, val = 0; mine.forEach(x=>{ const r=rewardOf(x); total += r.points!==undefined? r.points : r.cash; val += r.value; });
+    const head = card.type==="points"
+      ? `<div class="big num">${fmtPts(total)} <span class="sub" style="font-size:16px">pts</span></div><div class="sub num">≈ ${fmt$(val)} at ${cpp()}¢/pt · on ${fmt$(spend)} spent</div>`
+      : `<div class="big num">${fmt$(total)}</div><div class="sub num">cash back · on ${fmt$(spend)} spent${spend?` (${(total/spend*100).toFixed(1)}% avg)`:""}</div>`;
+    const breakdown = card.earn.filter(e=>byEarn[e.key]).map(e=>{
+      const b=byEarn[e.key];
+      return `<tr><td>${esc(e.label)}<div class="sub small num">${fmt$(b.spend)} spent</div></td>
+        <td class="r num">${card.type==="points"?fmtPts(b.amt)+" pts":fmt$(b.amt)}</td></tr>`;
+    }).join("");
+    return `<div class="card rewardcard ${id==="savor"?"savor":""}"><h2>${card.name}</h2>${head}
+      ${breakdown?`<table class="rates" style="margin-top:10px">${breakdown}</table>`:`<div class="sub" style="margin-top:8px">No purchases in this period.</div>`}</div>`;
+  }).join("");
+  document.getElementById("rewardCards").innerHTML = html;
+
+  // best card guide
+  const tips = CATEGORIES.filter(c=>!["rent","bills","other"].includes(c.id)).map(c=>{
+    const best = bestCardFor(c.id);
+    return `<tr><td>${c.ic} ${c.name}</td><td class="r"><span class="pill ${best.id}">${best.short}</span> <span class="num small">${best.label}</span></td></tr>`;
+  }).join("");
+  document.getElementById("bestCard").innerHTML = `<table class="rates">${tips}</table>
+    <div class="hint">Compares the default rate for each category, valuing Sapphire points at ${cpp()}¢. Booking through a card's travel portal can earn more.</div>`;
+
+  // rate editor
+  document.getElementById("rateEditor").innerHTML = ["csp","savor"].map(id=>{
+    const c=getCard(id);
+    return `<div style="margin:10px 0 4px;font-weight:700">${c.name}</div><table class="rates">${c.earn.map(e=>
+      `<tr><td>${esc(e.label)}${e.note?`<div class="sub small">${esc(e.note)}</div>`:""}</td>
+       <td class="r"><input class="num" type="number" step="0.5" min="0" inputmode="decimal" data-rate="${id}:${e.key}" value="${e.rate}"> ${c.type==="points"?"x":"%"}</td></tr>`).join("")}</table>`;
+  }).join("");
+  document.getElementById("cppInput").value = cpp();
+}
+function bestCardFor(catId){
+  const opts = ["csp","savor"].map(id=>{
+    const c=getCard(id), e=earnOf(id, defaultEarnKey(id,catId));
+    const centsPerDollar = c.type==="points" ? e.rate*cpp() : e.rate;
+    return {id, short:c.short, centsPerDollar, label: c.type==="points"? `${e.rate}x` : `${e.rate}%`};
+  });
+  return opts.sort((a,b)=>b.centsPerDollar-a.centsPerDollar)[0];
+}
+
+function renderSyncBanner(){
+  const el = document.getElementById("syncBanner");
+  const days = state.meta.lastExport ? (now()-state.meta.lastExport)/864e5 : Infinity;
+  const n = liveExpenses().length;
+  if(state.meta.changedSinceExport && n>0 && days>7){
+    el.innerHTML = `<div class="banner">⇅ ${state.meta.lastExport?`Last export was ${Math.floor(days)} days ago.`:"You haven't exported a backup yet."}<button data-goto="sync">Sync</button></div>`;
+  } else el.innerHTML = "";
+}
+function renderSync(){
+  const m = state.meta;
+  const parts = [];
+  parts.push(m.lastExport ? `Last export: ${new Date(m.lastExport).toLocaleString()}` : "Never exported from this device.");
+  if(m.lastImport) parts.push(`Last import: ${new Date(m.lastImport).toLocaleString()}${m.lastImportMsg?` — ${esc(m.lastImportMsg)}`:""}`);
+  if(m.changedSinceExport) parts.push("You have changes since your last export.");
+  document.getElementById("syncStatus").innerHTML = parts.join("<br>");
+  const n = liveExpenses().length;
+  document.getElementById("dataStats").textContent = `${n} expense${n===1?"":"s"} stored on this device.`;
+}
+
+/* ---------- Navigation ---------- */
+const TITLES = {overview:"Overview", expenses:"Expenses", budgets:"Budgets", rewards:"Rewards", sync:"Sync"};
+function go(view){
+  curView = view;
+  document.querySelectorAll("section.view").forEach(s=>s.classList.toggle("active", s.id==="view-"+view));
+  document.querySelectorAll("nav.tabs button[data-view]").forEach(b=>b.classList.toggle("active", b.dataset.view===view || (view==="budgets"&&b.dataset.view==="overview")));
+  document.getElementById("viewTitle").textContent = TITLES[view];
+  window.scrollTo(0,0);
+  render();
+}
+document.querySelectorAll("nav.tabs button[data-view]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.view)));
+document.addEventListener("click", e=>{
+  const g = e.target.closest("[data-goto]"); if(g){ e.preventDefault(); go(g.dataset.goto); return; }
+  const it = e.target.closest(".item[data-id]"); if(it){ openSheet(state.expenses[it.dataset.id]); }
+});
+function shiftMonth(d){ const [y,m]=curMonth.split("-").map(Number); curMonth = monthKey(new Date(y,m-1+d,1)); render(); }
+document.getElementById("prevMonth").onclick = ()=>shiftMonth(-1);
+document.getElementById("nextMonth").onclick = ()=>shiftMonth(1);
+document.getElementById("search").addEventListener("input", renderExpenses);
+document.getElementById("rewardRange").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  rewardRange=b.dataset.r;
+  document.querySelectorAll("#rewardRange button").forEach(x=>x.classList.toggle("active",x===b));
+  renderRewards();
+});
+
+/* ---------- Budgets & rates editing ---------- */
+document.getElementById("budgetEditor").addEventListener("change", e=>{
+  const cat = e.target.dataset.budget; if(!cat) return;
+  const v = parseAmount(e.target.value);
+  state.budgets[cat] = {id:cat, amount: isFinite(v)&&v>0 ? v : 0, updatedAt: now()};
+  save(); updateBudgetTotal(); toast("Budget saved");
+});
+document.getElementById("rateEditor").addEventListener("change", e=>{
+  const k = e.target.dataset.rate; if(!k) return;
+  const [cardId, key] = k.split(":"); const v = parseFloat(e.target.value);
+  if(!isFinite(v) || v<0){ renderRewards(); return; }
+  const c = getCard(cardId);
+  state.cards[cardId] = {id:cardId, earn: c.earn.map(x=>({key:x.key, rate: x.key===key? v : x.rate})), updatedAt: now()};
+  save(); renderRewards(); toast("Rate updated for new expenses");
+});
+document.getElementById("cppInput").addEventListener("change", e=>{
+  const v = parseFloat(e.target.value); if(!isFinite(v)||v<0) return;
+  state.settings.cpp = {id:"cpp", value:v, updatedAt:now()}; save(); renderRewards();
+});
+
+/* ---------- Expense sheet ---------- */
+const $ = id => document.getElementById(id);
+let editing = null;
+$("fCategory").innerHTML = CATEGORIES.map(c=>`<option value="${c.id}">${c.ic} ${c.name}</option>`).join("");
+$("fCard").innerHTML = Object.values(DEFAULT_CARDS).map(c=>`<option value="${c.id}">${c.name}</option>`).join("")
+  + PAY_OTHER.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+let earnTouched = false;
+
+function fillEarn(selectKey){
+  const cardId = $("fCard").value, card = getCard(cardId);
+  if(!card){ $("earnWrap").hidden = true; updatePreview(); return; }
+  $("earnWrap").hidden = false;
+  const key = selectKey || defaultEarnKey(cardId, $("fCategory").value);
+  $("fEarn").innerHTML = card.earn.map(e=>`<option value="${e.key}" ${e.key===key?"selected":""}>${esc(e.label)} — ${e.rate}${card.type==="points"?"x":"%"}</option>`).join("");
+  updatePreview();
+}
+function updatePreview(){
+  const cardId=$("fCard").value, card=getCard(cardId), amt=parseAmount($("fAmount").value);
+  const pv = $("earnPreview");
+  if(!card){
+    const best = bestCardFor($("fCategory").value);
+    pv.innerHTML = `No rewards tracked. Tip: <b>${best.short}</b> earns ${best.label} on ${catById[$("fCategory").value].name.toLowerCase()}.`;
+    $("earnHint").textContent=""; return;
+  }
+  const e = earnOf(cardId, $("fEarn").value);
+  $("earnHint").textContent = e.note || "";
+  const a = isFinite(amt)?amt:0;
+  pv.innerHTML = card.type==="points"
+    ? `Earns <b class="num">${fmtPts(a*e.rate)} points</b> (${e.rate}x)`
+    : `Earns <b class="num">${fmt$(a*e.rate/100)} cash back</b> (${e.rate}%)`;
+  const best = bestCardFor($("fCategory").value);
+  if(best.id!==cardId && !earnTouched) pv.innerHTML += `<div class="sub small" style="margin-top:4px">Tip: ${best.short} usually earns ${best.label} here.</div>`;
+}
+$("fCard").addEventListener("change", ()=>{ earnTouched=false; fillEarn(); try{localStorage.setItem(STORE_KEY+".lastCard",$("fCard").value);}catch(e){} });
+$("fCategory").addEventListener("change", ()=>{ if(!earnTouched) fillEarn(); else updatePreview(); });
+$("fEarn").addEventListener("change", ()=>{ earnTouched=true; updatePreview(); });
+$("fAmount").addEventListener("input", updatePreview);
+$("fMerchant").addEventListener("change", ()=>{
+  // remember category/card used for this merchant last time
+  if(editing) return;
+  const m = $("fMerchant").value.trim().toLowerCase(); if(!m) return;
+  const prev = liveExpenses().filter(x=>x.merchant.toLowerCase()===m).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+  if(prev){ $("fCategory").value=prev.category; $("fCard").value=prev.card; earnTouched=false; fillEarn(DEFAULT_CARDS[prev.card]?prev.earnKey:null); }
+});
+
+function openSheet(x){
+  editing = x || null; earnTouched = !!x;
+  $("sheetTitle").textContent = x ? "Edit expense" : "Add expense";
+  $("deleteBtn").hidden = !x;
+  $("fAmount").value = x ? x.amount.toFixed(2) : "";
+  $("fMerchant").value = x ? x.merchant : "";
+  $("fNote").value = x ? x.note : "";
+  $("fCategory").value = x ? x.category : "dining";
+  let lastCard = null; try{ lastCard = localStorage.getItem(STORE_KEY+".lastCard"); }catch(e){}
+  $("fCard").value = x ? x.card : (lastCard || "csp");
+  if(!$("fCard").value) $("fCard").value = "csp";
+  $("fDate").value = x ? x.date : (curMonth===monthKey(new Date()) ? todayStr() : curMonth+"-01");
+  const merchants = [...new Set(liveExpenses().map(e=>e.merchant).filter(Boolean))].slice(0,200);
+  $("merchantList").innerHTML = merchants.map(m=>`<option value="${esc(m)}">`).join("");
+  fillEarn(x && DEFAULT_CARDS[x.card] ? x.earnKey : null);
+  $("sheet").classList.add("open"); $("sheetBg").classList.add("open");
+  if(!x) setTimeout(()=>$("fAmount").focus(), 250);
+}
+function closeSheet(){ $("sheet").classList.remove("open"); $("sheetBg").classList.remove("open"); document.activeElement?.blur(); }
+$("addBtn").onclick = ()=>openSheet(null);
+$("sheetBg").onclick = closeSheet;
+
+$("expForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const amount = parseAmount($("fAmount").value);
+  if(!isFinite(amount) || amount===0){ toast("Enter an amount"); $("fAmount").focus(); return; }
+  const card = $("fCard").value;
+  const hasRewards = !!DEFAULT_CARDS[card];
+  const earnKey = hasRewards ? $("fEarn").value : null;
+  const rate = hasRewards ? earnOf(card, earnKey).rate : 0;
+  const x = {
+    id: editing ? editing.id : uid(),
+    amount, date: $("fDate").value || todayStr(), category: $("fCategory").value,
+    card, earnKey, rate, merchant: $("fMerchant").value.trim(), note: $("fNote").value.trim(),
+    createdAt: editing ? (editing.createdAt||now()) : now(), updatedAt: now(), deleted:false
+  };
+  // keep the originally earned rate when editing unless card/category-of-rewards changed
+  if(editing && editing.card===x.card && editing.earnKey===x.earnKey) x.rate = editing.rate;
+  state.expenses[x.id] = x; save();
+  closeSheet();
+  curMonth = x.date.slice(0,7);
+  toast(editing ? "Expense updated" : "Expense added");
+  render();
+});
+$("deleteBtn").onclick = ()=>{
+  if(!editing || !confirm("Delete this expense?")) return;
+  state.expenses[editing.id] = {...editing, deleted:true, updatedAt:now()};
+  save(); closeSheet(); toast("Deleted"); render();
+};
+
+/* ---------- Export / Import (merge) ---------- */
+function exportPayload(){
+  return { app:APP_ID, version:1, exportedAt:new Date().toISOString(), fromDevice:state.deviceId,
+    data:{ expenses:state.expenses, budgets:state.budgets, cards:state.cards, settings:state.settings } };
+}
+$("exportBtn").onclick = async ()=>{
+  const json = JSON.stringify(exportPayload());
+  const d = new Date();
+  const name = `ledger-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+  const file = new File([json], name, {type:"application/json"});
+  let done = false;
+  try{
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:"Pocket Ledger data"});
+      done = true;
+    }
+  }catch(err){ if(err && err.name==="AbortError") return; }
+  if(!done){
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+  state.meta.lastExport = now(); state.meta.changedSinceExport = false; save(false);
+  toast("Exported"); render();
+};
+$("importBtn").onclick = ()=>$("importFile").click();
+$("importFile").addEventListener("change", async e=>{
+  const f = e.target.files[0]; e.target.value = ""; if(!f) return;
+  try{
+    const payload = JSON.parse(await f.text());
+    if(payload.app!==APP_ID || !payload.data) throw new Error("This doesn't look like a Pocket Ledger export.");
+    const res = mergeData(payload.data);
+    const msg = `Added ${res.added}, updated ${res.updated}, removed ${res.removed}` + (res.other?` · ${res.other} setting${res.other===1?"":"s"} synced`:"");
+    state.meta.lastImport = now(); state.meta.lastImportMsg = msg; save(false);
+    toast(msg); render();
+  }catch(err){ toast(err.message || "Couldn't read that file"); }
+});
+/* Last-write-wins merge per record using updatedAt. Deletions travel as tombstones. */
+function mergeData(inc){
+  const r = {added:0, updated:0, removed:0, other:0};
+  for(const [id, x] of Object.entries(inc.expenses||{})){
+    if(!x || !x.id || typeof x.amount!=="number") continue;
+    const cur = state.expenses[id];
+    if(!cur){ state.expenses[id]=x; if(!x.deleted) r.added++; continue; }
+    if((x.updatedAt||0) > (cur.updatedAt||0)){
+      if(x.deleted && !cur.deleted) r.removed++;
+      else if(!x.deleted && cur.deleted) r.added++;
+      else if(!x.deleted) r.updated++;
+      state.expenses[id]=x;
+    }
+  }
+  for(const coll of ["budgets","cards","settings"]){
+    for(const [id, x] of Object.entries(inc[coll]||{})){
+      if(!x) continue;
+      const cur = state[coll][id];
+      if(!cur || (x.updatedAt||0) > (cur.updatedAt||0)){
+        if(cur && JSON.stringify(cur)===JSON.stringify(x)) continue;
+        state[coll][id]=x; r.other++;
+      }
+    }
+  }
+  // if everything on this device now matches the other device, there is nothing new to export
+  return r;
+}
+$("wipeBtn").onclick = ()=>{
+  if(!confirm("Erase all expenses, budgets and settings on this device? Export a backup first if you might need it.")) return;
+  if(!confirm("Are you sure? This cannot be undone.")) return;
+  state = emptyState(); save(false); toast("All data erased"); render();
+};
+
+/* ---------- Toast ---------- */
+let toastT;
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400); }
+
+/* ---------- Boot ---------- */
+render();
+if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost")){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
