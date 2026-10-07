@@ -4,7 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pocket Ledger</title>
-<meta name="theme-color" content="#145340">
+<meta name="theme-color" content="#f5f5f7" id="themeColor">
+<script>
+/* Apply the saved light/dark choice before the page draws, so it never flashes the wrong colors */
+(function(){
+  var t = null; try{ t = localStorage.getItem("pocketLedger.v1.theme"); }catch(e){}
+  var dark = t ? t==="dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if(t) document.documentElement.dataset.theme = t;
+  document.documentElement.classList.toggle("is-dark", dark);
+  document.getElementById("themeColor").content = dark ? "#000000" : "#f5f5f7";
+})();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,124 +23,229 @@
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
 <style>
+/* Palette: black, white and navy. Red/amber are kept only for over-budget warnings. */
 :root{
-  --bg:#f4f6f3; --surface:#ffffff; --surface2:#eef2ed; --ink:#17201b; --muted:#5f6b64;
-  --line:#dde3dc; --brand:#145340; --brand-ink:#ffffff; --accent:#c98a1c; --good:#2f7d4f;
-  --warn:#b8741a; --bad:#b33a2f; --bar:#d7e2d9;
-  --csp:#1d4f91; --savor:#a33a2a;
-  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
+  --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f1f4; --ink:#1d1d1f; --muted:#6e6e73;
+  --line:#e4e4e9; --brand:#0f2a5c; --brand-ink:#ffffff; --link:#0f2a5c;
+  --good:#0f2a5c; --warn:#c27c0e; --bad:#c4302b; --bar:#e8e8ed;
+  --csp:#0f2a5c; --savor:#1d1d1f;
+  --glass:rgba(245,245,247,.72); --glass-nav:rgba(255,255,255,.72);
+  --card-border:transparent; --card-hover:0 4px 10px rgba(0,0,0,.04),0 16px 40px rgba(0,0,0,.07); --seg-thumb:#ffffff;
+  color-scheme:light;
+  --radius:20px; --shadow:0 2px 6px rgba(0,0,0,.03),0 8px 24px rgba(0,0,0,.04);
+  /* Apple-style motion curves */
+  --ease:cubic-bezier(.28,.11,.32,1); --sheet:cubic-bezier(.32,.72,0,1); --spring:cubic-bezier(.34,1.56,.64,1);
+}
+/* Dark: chosen with the switch, or following the device when no choice has been made */
+:root[data-theme="dark"]{
+    --bg:#000000; --surface:#121316; --surface2:#1c1d22; --ink:#f5f5f7; --muted:#a1a1a6;
+    --line:#26272d; --brand:#2c4f94; --brand-ink:#ffffff; --link:#8fb1ff;
+    --good:#5b84d6; --warn:#e0a24a; --bad:#ff6b5e; --bar:#24262c;
+    --csp:#8fb1ff; --savor:#f5f5f7;
+    --glass:rgba(0,0,0,.72); --glass-nav:rgba(18,19,22,.78);
+    --shadow:none;
+    --card-border:var(--line); --card-hover:none; --seg-thumb:#2e3038;
+    color-scheme:dark;
 }
 @media (prefers-color-scheme: dark){
-  :root{
-    --bg:#0f1512; --surface:#18201c; --surface2:#1f2924; --ink:#e7ede9; --muted:#9aa8a0;
-    --line:#2b3631; --brand:#3fa37a; --brand-ink:#08130e; --accent:#e3a843; --good:#55b97f;
-    --warn:#e0a24a; --bad:#e2685c; --bar:#2c3832; --csp:#6c9be0; --savor:#e07a68;
+  :root:not([data-theme="light"]){
+    --bg:#000000; --surface:#121316; --surface2:#1c1d22; --ink:#f5f5f7; --muted:#a1a1a6;
+    --line:#26272d; --brand:#2c4f94; --brand-ink:#ffffff; --link:#8fb1ff;
+    --good:#5b84d6; --warn:#e0a24a; --bad:#ff6b5e; --bar:#24262c;
+    --csp:#8fb1ff; --savor:#f5f5f7;
+    --glass:rgba(0,0,0,.72); --glass-nav:rgba(18,19,22,.78);
     --shadow:none;
+    --card-border:var(--line); --card-hover:none; --seg-thumb:#2e3038;
+    color-scheme:dark;
   }
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
-body{font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
-  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
-  padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+body{font:17px/1.42 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","Segoe UI",Roboto,sans-serif;
+  letter-spacing:-.012em;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  padding-bottom:calc(88px + env(safe-area-inset-bottom))}
 .num{font-variant-numeric:tabular-nums}
-header{position:sticky;top:0;z-index:5;background:var(--bg);
-  padding:calc(10px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:10px}
-header h1{font-size:22px;margin:0;flex:1;letter-spacing:-.01em}
-.monthnav{display:flex;align-items:center;gap:4px}
+
+/* Frosted glass header, gains a hairline once you scroll */
+header{position:sticky;top:0;z-index:5;background:var(--glass);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid transparent;transition:border-color .3s var(--ease);
+  padding:calc(14px + env(safe-area-inset-top)) 16px 10px}
+header.scrolled{border-bottom-color:var(--line)}
+.headin{max-width:688px;margin:0 auto;display:flex;align-items:center;gap:10px}
+header h1{font:700 34px/1.1 -apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif;
+  margin:0;flex:1;letter-spacing:-.025em}
+.monthnav{display:flex;align-items:center;gap:6px;transition:opacity .3s var(--ease)}
 .monthnav span{min-width:92px;text-align:center;font-weight:600;font-size:15px}
 .iconbtn{border:0;background:var(--surface2);color:var(--ink);width:34px;height:34px;border-radius:50%;
-  font-size:18px;line-height:1;cursor:pointer}
-main{max-width:720px;margin:0 auto;padding:0 16px}
+  font-size:18px;line-height:1;cursor:pointer;transition:transform .2s var(--ease),background .2s}
+.iconbtn:hover{background:var(--line)}
+.iconbtn:active{transform:scale(.88)}
+/* Light/dark switch: sun and moon swap with a spin */
+.themebtn{position:relative;display:grid;place-items:center;flex:none}
+.themebtn svg{position:absolute;width:18px;height:18px;transition:transform .6s var(--ease),opacity .35s var(--ease)}
+.themebtn .sun{opacity:0;transform:rotate(-90deg) scale(.4)}
+.is-dark .themebtn .sun{opacity:1;transform:none}
+.is-dark .themebtn .moon{opacity:0;transform:rotate(90deg) scale(.4)}
+/* The new theme spreads out in a circle from the switch */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+
+main{max-width:720px;margin:0 auto;padding:8px 16px 0}
 section.view{display:none}
 section.view.active{display:block}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px;margin:0 0 12px;box-shadow:var(--shadow)}
+
+/* Entrance: content rises and fades in, one block after another */
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+.view.enter > *, .view.enter .grid2 > *, .view.enter #expList > *{animation:rise .8s var(--ease) both}
+.view.enter > :nth-child(2){animation-delay:.06s} .view.enter > :nth-child(3){animation-delay:.12s}
+.view.enter > :nth-child(4){animation-delay:.18s} .view.enter > :nth-child(5){animation-delay:.24s}
+.view.enter > :nth-child(n+6){animation-delay:.3s}
+.view.enter .grid2 > :nth-child(2){animation-delay:.16s}
+.view.enter #expList > :nth-child(n+2){animation-delay:.2s} .view.enter #expList > :nth-child(n+5){animation-delay:.3s}
+header h1.swap{animation:rise .6s var(--ease) both}
+.refresh{animation:fadein .45s var(--ease) both}
+
+.card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--radius);padding:20px;margin:0 0 14px;box-shadow:var(--shadow);
+  transition:transform .4s var(--ease),box-shadow .4s var(--ease)}
+@media (hover:hover){ .card:hover{box-shadow:var(--card-hover)} }
 .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;font-weight:600}
-.big{font-size:32px;font-weight:700;letter-spacing:-.02em}
+.big{font:700 40px/1.1 -apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif;letter-spacing:-.03em}
 .sub{color:var(--muted);font-size:14px}
 .row{display:flex;align-items:center;gap:10px}
 .spread{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.bar{height:8px;background:var(--bar);border-radius:99px;overflow:hidden;margin-top:6px}
-.bar > i{display:block;height:100%;background:var(--good);border-radius:99px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bar{height:8px;background:var(--bar);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar > i{display:block;height:100%;background:var(--good);border-radius:99px;transition:width 1.1s var(--ease),background .3s}
 .bar.warn > i{background:var(--warn)} .bar.over > i{background:var(--bad)}
-.budget-row{padding:10px 0;border-top:1px solid var(--line)}
+.budget-row{padding:12px 0;border-top:1px solid var(--line)}
 .budget-row:first-of-type{border-top:0;padding-top:0}
 .over-text{color:var(--bad)}
-.list .item{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.list .item{display:flex;gap:12px;align-items:center;padding:12px 8px;margin:0 -8px;border-top:1px solid var(--line);
+  border-radius:12px;cursor:pointer;transition:background .2s var(--ease),transform .2s var(--ease)}
 .list .item:first-child{border-top:0}
-.dot{width:36px;height:36px;border-radius:10px;background:var(--surface2);display:grid;place-items:center;font-size:18px;flex:none}
+@media (hover:hover){ .list .item:hover{background:var(--surface2)} }
+.list .item:active{transform:scale(.985);background:var(--surface2)}
+.dot{width:38px;height:38px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;font-size:18px;flex:none}
 .item .main{flex:1;min-width:0}
 .item .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .item .meta{font-size:13px;color:var(--muted)}
 .item .amt{text-align:right;font-weight:600}
 .item .amt small{display:block;font-weight:500;font-size:12px}
-.pill{display:inline-block;font-size:12px;padding:1px 7px;border-radius:99px;background:var(--surface2);color:var(--muted)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--surface2);color:var(--muted)}
 .pill.csp{color:var(--csp)} .pill.savor{color:var(--savor)}
-.daylabel{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 2px}
+.daylabel{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:18px 4px 6px}
 .empty{color:var(--muted);text-align:center;padding:24px 8px}
-label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+
+label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 6px}
 input,select,textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--surface2);
-  border:1px solid var(--line);border-radius:10px;padding:11px 12px;appearance:none;-webkit-appearance:none}
+  border:1px solid transparent;border-radius:12px;padding:12px 14px;appearance:none;-webkit-appearance:none;
+  transition:box-shadow .25s var(--ease),border-color .25s var(--ease),background .25s}
 select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
   background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
-input:focus,select:focus{outline:2px solid var(--brand);outline-offset:0}
-.amount-input{font-size:30px;font-weight:700;text-align:center;padding:12px}
-.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:700;cursor:pointer;
-  background:var(--brand);color:var(--brand-ink);margin-top:14px}
-.btn.secondary{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand);background-color:var(--surface);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 22%,transparent)}
+.amount-input{font:700 36px/1.1 -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;letter-spacing:-.02em;text-align:center;padding:14px}
+
+/* Pill buttons with a gentle press */
+.btn{display:block;width:100%;border:0;border-radius:980px;padding:15px;font:inherit;font-weight:600;cursor:pointer;
+  background:var(--brand);color:var(--brand-ink);margin-top:14px;
+  transition:transform .2s var(--ease),filter .2s,background .2s}
+@media (hover:hover){ .btn:hover{filter:brightness(1.12)} }
+.btn:active{transform:scale(.97)}
+.btn.secondary{background:var(--surface2);color:var(--ink)}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
 .hint{font-size:13px;color:var(--muted);margin-top:6px;min-height:1em}
-.earnpreview{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);font-size:14px}
+.earnpreview{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--surface2);font-size:14px}
 .earnpreview b{color:var(--ink)}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);
-  display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
-nav.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;font-weight:600;
-  padding:4px 0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
-nav.tabs button .ic{font-size:21px;line-height:1}
-nav.tabs button.active{color:var(--brand)}
-nav.tabs button.add .ic{background:var(--brand);color:var(--brand-ink);width:44px;height:44px;border-radius:50%;
-  display:grid;place-items:center;font-size:26px;margin-top:-18px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
-.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;display:none}
-.sheet-bg.open{display:block}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-radius:18px 18px 0 0;
-  max-height:92vh;overflow:auto;padding:14px 16px calc(20px + env(safe-area-inset-bottom));
-  transform:translateY(105%);transition:transform .22s ease;max-width:720px;margin:0 auto}
+
+/* Frosted glass tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--glass-nav);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1;max-width:140px;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;font-weight:600;
+  padding:4px 0;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:color .3s var(--ease)}
+nav.tabs button .ic{font-size:21px;line-height:1;display:inline-block}
+nav.tabs button.active{color:var(--link)}
+nav.tabs button.active .ic{animation:pop .5s var(--ease)}
+nav.tabs button.add .ic{background:var(--brand);color:var(--brand-ink);width:48px;height:48px;border-radius:50%;
+  display:grid;place-items:center;font-size:28px;margin-top:-20px;box-shadow:0 6px 18px rgba(15,42,92,.35);
+  transition:transform .35s var(--spring),box-shadow .35s var(--ease)}
+@media (hover:hover){ nav.tabs button.add:hover .ic{transform:scale(1.07) rotate(90deg)} }
+nav.tabs button.add:active .ic{transform:scale(.9)}
+
+/* Bottom sheet slides up on the iOS sheet curve */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20;opacity:0;visibility:hidden;
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);transition:opacity .45s var(--ease),visibility .45s}
+.sheet-bg.open{opacity:1;visibility:visible}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-radius:24px 24px 0 0;
+  max-height:92vh;overflow:auto;padding:14px 20px calc(22px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .55s var(--sheet);max-width:720px;margin:0 auto;
+  box-shadow:0 -10px 40px rgba(0,0,0,.12)}
 .sheet.open{transform:none}
-.sheet .grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 10px}
-.sheet h3{margin:0 0 4px;font-size:19px}
-.banner{background:color-mix(in srgb,var(--accent) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));
-  border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px;display:flex;gap:10px;align-items:center}
-.banner button{margin-left:auto;border:0;background:var(--accent);color:#1b1305;font-weight:700;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;font-weight:700}
-.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;
-  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
-.toast.show{opacity:1}
-.rewardcard{border-left:4px solid var(--csp)}
-.rewardcard.savor{border-left-color:var(--savor)}
+.sheet .grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 12px}
+.sheet h3{margin:0 0 8px;font:700 24px/1.2 -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;letter-spacing:-.02em}
+/* On a computer screen the sheet becomes a centered window that zooms in */
+@media (min-width:760px){
+  .sheet{left:50%;right:auto;bottom:auto;top:50%;width:min(560px,92vw);margin:0;border-radius:24px;max-height:88vh;
+    padding:24px 28px 26px;opacity:0;visibility:hidden;transform:translate(-50%,-47%) scale(.95);
+    box-shadow:0 30px 80px rgba(0,0,0,.25);
+    transition:transform .5s var(--sheet),opacity .3s var(--ease),visibility .5s}
+  .sheet.open{opacity:1;visibility:visible;transform:translate(-50%,-50%)}
+  .sheet .grab{display:none}
+}
+
+.banner{background:color-mix(in srgb,var(--brand) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--brand) 25%,var(--line));
+  border-radius:16px;padding:12px 14px;font-size:14px;margin-bottom:14px;display:flex;gap:10px;align-items:center}
+.banner button{margin-left:auto;border:0;background:var(--brand);color:var(--brand-ink);border-radius:980px;padding:7px 14px;
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .2s var(--ease)}
+.banner button:active{transform:scale(.95)}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,16px) scale(.96);z-index:30;
+  background:var(--ink);color:var(--bg);padding:11px 20px;border-radius:980px;font-size:14px;font-weight:500;opacity:0;
+  transition:opacity .35s var(--ease),transform .5s var(--spring);pointer-events:none;max-width:90vw;text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.toast.show{opacity:1;transform:translate(-50%,0) scale(1)}
+.rewardcard{border-top:4px solid var(--csp)}
+.rewardcard.savor{border-top-color:var(--savor)}
 table.rates{width:100%;border-collapse:collapse;font-size:14px}
-table.rates td{padding:7px 0;border-top:1px solid var(--line);vertical-align:middle}
+table.rates td{padding:8px 0;border-top:1px solid var(--line);vertical-align:middle}
 table.rates tr:first-child td{border-top:0}
 table.rates td.r{text-align:right;white-space:nowrap}
-table.rates input{width:70px;padding:6px 8px;text-align:right;font-size:15px}
-.seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:3px;margin-bottom:12px}
-.seg button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:600;padding:7px;border-radius:8px;cursor:pointer}
-.seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
-.search{margin-bottom:10px}
+table.rates input{width:74px;padding:7px 9px;text-align:right;font-size:15px}
+
+/* Segmented control with a sliding thumb */
+.seg{position:relative;display:flex;background:var(--surface2);border-radius:12px;padding:3px;gap:3px;margin-bottom:14px}
+.seg::before{content:"";position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 12px) / 3);border-radius:9px;
+  background:var(--seg-thumb);box-shadow:0 1px 3px rgba(0,0,0,.08),0 3px 8px rgba(0,0,0,.06);
+  transform:translateX(calc(var(--i,0) * (100% + 3px)));transition:transform .45s var(--ease)}
+.seg button{position:relative;z-index:1;flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:600;
+  padding:8px;border-radius:9px;cursor:pointer;transition:color .3s var(--ease)}
+.seg button.active{color:var(--ink)}
+.search{margin-bottom:12px}
 .small{font-size:13px}
-a{color:var(--brand)}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
 
-<header>
+<header id="topbar"><div class="headin">
   <h1 id="viewTitle">Overview</h1>
   <div class="monthnav" id="monthNav">
     <button class="iconbtn" id="prevMonth" aria-label="Previous month">‹</button>
     <span id="monthLabel" class="num"></span>
     <button class="iconbtn" id="nextMonth" aria-label="Next month">›</button>
   </div>
-</header>
+  <button class="iconbtn themebtn" id="themeBtn" aria-label="Switch to dark mode">
+    <svg class="moon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
+  </button>
+</div></header>
 
 <main>
   <!-- OVERVIEW -->
@@ -204,6 +319,11 @@ a{color:var(--brand)}
       <button class="btn secondary" id="importBtn">Import data</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <div class="hint" id="syncStatus"></div>
+    </div>
+    <div class="card">
+      <h2>Spreadsheet</h2>
+      <p class="sub" style="margin-top:0">Download every expense as an Excel file, with a monthly summary and your budgets. It opens in Excel, Numbers and Google Sheets. This is a read-only copy: to move data between devices, use Export data above.</p>
+      <button class="btn secondary" id="excelBtn">Export to Excel</button>
     </div>
     <div class="card">
       <h2>About your data</h2>
@@ -394,6 +514,35 @@ function liveExpenses(){ return Object.values(state.expenses).filter(x=>!x.delet
 function expensesInMonth(mk){ return liveExpenses().filter(x=>x.date.startsWith(mk)); }
 function budgetOf(cat){ const b=state.budgets[cat]; return b && !b.deleted && b.amount>0 ? b.amount : 0; }
 
+/* ---------- Motion ---------- */
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+/* Numbers roll from their old value to the new one */
+function countUp(el, to, format){
+  const from = el._val ?? 0; el._val = to;
+  if(reduceMotion.matches || from===to){ el.textContent = format(to); return; }
+  const start = performance.now(), dur = 900;
+  cancelAnimationFrame(el._raf);
+  const step = t=>{
+    const p = Math.min(1,(t-start)/dur), e = 1-Math.pow(1-p,4);
+    el.textContent = format(from+(to-from)*e);
+    if(p<1) el._raf = requestAnimationFrame(step);
+  };
+  el._raf = requestAnimationFrame(step);
+}
+/* Progress bars grow from their current width to the target */
+function growBars(root=document){
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    root.querySelectorAll(".bar > i[data-w]").forEach(i=>{ i.style.width = i.dataset.w; });
+  }));
+}
+/* Replays a CSS animation class on an element */
+function replay(el, cls){ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+let enterT;
+function animateView(){
+  const v = document.getElementById("view-"+curView);
+  replay(v, "enter"); clearTimeout(enterT); enterT = setTimeout(()=>v.classList.remove("enter"), 1400);
+}
+
 /* ---------- Rendering ---------- */
 function render(){
   document.getElementById("monthLabel").textContent = monthLabel(curMonth);
@@ -423,7 +572,7 @@ function renderOverview(){
   const xs = expensesInMonth(curMonth);
   const spent = xs.reduce((a,x)=>a+x.amount,0);
   const totalBudget = CATEGORIES.reduce((a,c)=>a+budgetOf(c.id),0);
-  document.getElementById("ovSpent").textContent = fmt$(spent);
+  countUp(document.getElementById("ovSpent"), spent, n=>fmt$(n));
   const bar = document.getElementById("ovBar");
   if(totalBudget>0){
     const pct = spent/totalBudget;
@@ -431,16 +580,16 @@ function renderOverview(){
       ? `${fmt$(totalBudget-spent)} left of ${fmt$(totalBudget,false)} budget`
       : `<span class="over-text">${fmt$(spent-totalBudget)} over</span> your ${fmt$(totalBudget,false)} budget`;
     bar.style.display=""; bar.className = "bar" + (pct>1?" over":pct>.85?" warn":"");
-    bar.firstElementChild.style.width = Math.min(100,pct*100)+"%";
+    bar.firstElementChild.dataset.w = Math.min(100,pct*100)+"%";
   } else {
     document.getElementById("ovBudgetLine").innerHTML = `No budgets set yet. <a href="#" data-goto="budgets">Set budgets</a>`;
     bar.style.display="none";
   }
   let pts=0, cash=0;
   xs.forEach(x=>{ const r=rewardOf(x); if(!r) return; if(r.points!==undefined) pts+=r.points; else cash+=r.cash; });
-  document.getElementById("ovCsp").textContent = fmtPts(pts);
+  countUp(document.getElementById("ovCsp"), pts, fmtPts);
   document.getElementById("ovCspVal").textContent = `≈ ${fmt$(pts*cpp()/100)} value`;
-  document.getElementById("ovSavor").textContent = fmt$(cash);
+  countUp(document.getElementById("ovSavor"), cash, n=>fmt$(n));
 
   // budgets
   const byCat = {}; xs.forEach(x=>byCat[x.category]=(byCat[x.category]||0)+x.amount);
@@ -452,12 +601,13 @@ function renderOverview(){
       const pct=s/b;
       return `<div class="budget-row"><div class="spread"><span>${c.ic} ${c.name}</span>
         <span class="num ${pct>1?"over-text":""}">${fmt$(s)} <span class="sub">/ ${fmt$(b,false)}</span></span></div>
-        <div class="bar ${pct>1?"over":pct>.85?"warn":""}"><i style="width:${Math.min(100,pct*100)}%"></i></div></div>`;
+        <div class="bar ${pct>1?"over":pct>.85?"warn":""}"><i style="width:0" data-w="${Math.min(100,pct*100)}%"></i></div></div>`;
     });
   document.getElementById("ovBudgets").innerHTML = rows.join("") || `<div class="empty">Nothing yet this month.</div>`;
   const recent = xs.sort((a,b)=>b.date.localeCompare(a.date)||b.updatedAt-a.updatedAt).slice(0,5);
   document.getElementById("ovRecent").innerHTML = recent.map(itemHTML).join("") || `<div class="empty">Tap + to log your first expense.</div>`;
   renderSyncBanner();
+  growBars();
 }
 
 function renderExpenses(){
@@ -465,7 +615,7 @@ function renderExpenses(){
   let xs = expensesInMonth(curMonth);
   if(q) xs = xs.filter(x=>(x.merchant+" "+x.note+" "+(catById[x.category]?.name||"")).toLowerCase().includes(q));
   xs.sort((a,b)=>b.date.localeCompare(a.date)||b.updatedAt-a.updatedAt);
-  document.getElementById("expTotal").textContent = fmt$(xs.reduce((a,x)=>a+x.amount,0));
+  countUp(document.getElementById("expTotal"), xs.reduce((a,x)=>a+x.amount,0), n=>fmt$(n));
   if(!xs.length){ document.getElementById("expList").innerHTML = `<div class="card empty">No expenses ${q?"match your search":"this month"}.</div>`; return; }
   const groups = {}; xs.forEach(x=>(groups[x.date]=groups[x.date]||[]).push(x));
   document.getElementById("expList").innerHTML = Object.keys(groups).map(d=>
@@ -562,23 +712,29 @@ function go(view){
   curView = view;
   document.querySelectorAll("section.view").forEach(s=>s.classList.toggle("active", s.id==="view-"+view));
   document.querySelectorAll("nav.tabs button[data-view]").forEach(b=>b.classList.toggle("active", b.dataset.view===view || (view==="budgets"&&b.dataset.view==="overview")));
-  document.getElementById("viewTitle").textContent = TITLES[view];
+  const title = document.getElementById("viewTitle");
+  if(title.textContent!==TITLES[view]){ title.textContent = TITLES[view]; replay(title, "swap"); }
   window.scrollTo(0,0);
   render();
+  animateView();
 }
 document.querySelectorAll("nav.tabs button[data-view]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.view)));
 document.addEventListener("click", e=>{
   const g = e.target.closest("[data-goto]"); if(g){ e.preventDefault(); go(g.dataset.goto); return; }
   const it = e.target.closest(".item[data-id]"); if(it){ openSheet(state.expenses[it.dataset.id]); }
 });
-function shiftMonth(d){ const [y,m]=curMonth.split("-").map(Number); curMonth = monthKey(new Date(y,m-1+d,1)); render(); }
+function shiftMonth(d){
+  const [y,m]=curMonth.split("-").map(Number); curMonth = monthKey(new Date(y,m-1+d,1)); render();
+  replay(document.querySelector("main"), "refresh");
+}
+window.addEventListener("scroll", ()=>document.getElementById("topbar").classList.toggle("scrolled", window.scrollY>4), {passive:true});
 document.getElementById("prevMonth").onclick = ()=>shiftMonth(-1);
 document.getElementById("nextMonth").onclick = ()=>shiftMonth(1);
 document.getElementById("search").addEventListener("input", renderExpenses);
 document.getElementById("rewardRange").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
   rewardRange=b.dataset.r;
-  document.querySelectorAll("#rewardRange button").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll("#rewardRange button").forEach((x,i)=>{ x.classList.toggle("active",x===b); if(x===b) e.currentTarget.style.setProperty("--i", i); });
   renderRewards();
 });
 
@@ -668,6 +824,7 @@ function openSheet(x){
 function closeSheet(){ $("sheet").classList.remove("open"); $("sheetBg").classList.remove("open"); document.activeElement?.blur(); }
 $("addBtn").onclick = ()=>openSheet(null);
 $("sheetBg").onclick = closeSheet;
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("sheet").classList.contains("open")) closeSheet(); });
 
 $("expForm").addEventListener("submit", e=>{
   e.preventDefault();
@@ -702,25 +859,33 @@ function exportPayload(){
   return { app:APP_ID, version:1, exportedAt:new Date().toISOString(), fromDevice:state.deviceId,
     data:{ expenses:state.expenses, budgets:state.budgets, cards:state.cards, settings:state.settings } };
 }
-$("exportBtn").onclick = async ()=>{
-  const json = JSON.stringify(exportPayload());
-  const d = new Date();
-  const name = `ledger-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`;
-  const file = new File([json], name, {type:"application/json"});
-  let done = false;
+/* Opens the share sheet on iPhone, downloads on a computer. Returns false if the person cancelled. */
+async function shareFile(file, title){
   try{
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:"Pocket Ledger data"});
-      done = true;
+      await navigator.share({files:[file], title});
+      return true;
     }
-  }catch(err){ if(err && err.name==="AbortError") return; }
-  if(!done){
-    const url = URL.createObjectURL(file);
-    const a = document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
-  }
+  }catch(err){ if(err && err.name==="AbortError") return false; }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a"); a.href=url; a.download=file.name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  return true;
+}
+function stamp(){ const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`; }
+$("exportBtn").onclick = async ()=>{
+  const json = JSON.stringify(exportPayload());
+  const file = new File([json], `ledger-${stamp()}.json`, {type:"application/json"});
+  if(!await shareFile(file, "Pocket Ledger data")) return;
   state.meta.lastExport = now(); state.meta.changedSinceExport = false; save(false);
   toast("Exported"); render();
+};
+$("excelBtn").onclick = async ()=>{
+  const xs = liveExpenses();
+  if(!xs.length){ toast("No expenses to export yet"); return; }
+  const file = new File([buildWorkbook(xs)], `pocket-ledger-${stamp()}.xlsx`,
+    {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  if(await shareFile(file, "Pocket Ledger spreadsheet")) toast("Spreadsheet exported");
 };
 $("importBtn").onclick = ()=>$("importFile").click();
 $("importFile").addEventListener("change", async e=>{
@@ -767,12 +932,153 @@ $("wipeBtn").onclick = ()=>{
   state = emptyState(); save(false); toast("All data erased"); render();
 };
 
+/* ---------- Excel (.xlsx) export ----------
+   An .xlsx file is a zip of XML documents. Building it here keeps the app
+   offline-friendly with no outside libraries. */
+const XL_TEXT=0, XL_HEAD=1, XL_DATE=2, XL_MONEY=3, XL_INT=4, XL_BOLDMONEY=5;
+function xlEsc(v){ return String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function xlCol(i){ let s=""; i++; while(i){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+function xlSerial(ds){ const [y,m,d]=ds.split("-").map(Number); return (Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/864e5; }
+/* cells: {v, s} where s is a style above; numbers stay numbers so Excel can add them up */
+function xlSheet(rows, widths, filter){
+  const body = rows.map((row,r)=>`<row r="${r+1}">`+row.map((c,i)=>{
+    if(c==null || c.v==null || c.v==="") return "";
+    const ref = xlCol(i)+(r+1), st = c.s ? ` s="${c.s}"` : "";
+    return typeof c.v==="number"
+      ? `<c r="${ref}"${st}><v>${c.v}</v></c>`
+      : `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xlEsc(c.v)}</t></is></c>`;
+  }).join("")+`</row>`).join("");
+  const last = xlCol(widths.length-1)+rows.length;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${last}"/>`
+    +`<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+    +`<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols>`
+    +`<sheetData>${body}</sheetData>${filter?`<autoFilter ref="A1:${last}"/>`:""}</worksheet>`;
+}
+function buildWorkbook(xs){
+  const T = v=>({v, s:XL_TEXT}), H = v=>({v, s:XL_HEAD}), M = v=>({v:Math.round(v*100)/100, s:XL_MONEY}), I = v=>({v:Math.round(v), s:XL_INT});
+  xs = [...xs].sort((a,b)=>a.date.localeCompare(b.date)||a.createdAt-b.createdAt);
+  const payName = id => DEFAULT_CARDS[id]?.name || PAY_OTHER.find(p=>p.id===id)?.name || id;
+
+  // Sheet 1: every expense
+  const exp = [["Date","Merchant","Category","Amount","Paid with","Rewards category","Rate","Points earned","Cash back","Reward value ($)","Note"].map(H)];
+  xs.forEach(x=>{
+    const card = getCard(x.card), r = rewardOf(x);
+    const earn = card ? card.earn.find(e=>e.key===x.earnKey) : null;
+    exp.push([{v:xlSerial(x.date), s:XL_DATE}, T(x.merchant), T(catById[x.category]?.name||x.category), M(x.amount),
+      T(payName(x.card)), T(earn?.label||""), T(card ? `${x.rate}${card.type==="points"?"x":"%"}` : ""),
+      r && r.points!==undefined ? I(r.points) : null, r && r.cash!==undefined ? M(r.cash) : null, r ? M(r.value) : null, T(x.note)]);
+  });
+
+  // Sheet 2: one row per month
+  const totalBudget = CATEGORIES.reduce((a,c)=>a+budgetOf(c.id),0);
+  const months = {};
+  xs.forEach(x=>{
+    const m = months[x.date.slice(0,7)] ??= {spent:0, pts:0, cash:0, value:0};
+    const r = rewardOf(x); m.spent += x.amount;
+    if(r){ m.value += r.value; if(r.points!==undefined) m.pts += r.points; else m.cash += r.cash; }
+  });
+  const mon = [["Month","Spent","Budget","Left over","Sapphire points","Savor cash back","Total reward value ($)"].map(H)];
+  Object.keys(months).sort().forEach(k=>{
+    const m = months[k];
+    mon.push([T(monthLabel(k)), M(m.spent), totalBudget?M(totalBudget):null, totalBudget?M(totalBudget-m.spent):null, I(m.pts), M(m.cash), M(m.value)]);
+  });
+
+  // Sheet 3: spending by category for each month, against its budget
+  const cat = [["Month","Category","Spent","Budget","Left over"].map(H)];
+  Object.keys(months).sort().forEach(k=>{
+    const by = {}; xs.filter(x=>x.date.startsWith(k)).forEach(x=>by[x.category]=(by[x.category]||0)+x.amount);
+    CATEGORIES.filter(c=>by[c.id]||budgetOf(c.id)).forEach(c=>{
+      const b = budgetOf(c.id), sp = by[c.id]||0;
+      cat.push([T(monthLabel(k)), T(c.name), M(sp), b?M(b):null, b?M(b-sp):null]);
+    });
+  });
+
+  // Sheet 4: current monthly budgets
+  const bud = [["Category","Monthly budget"].map(H)];
+  CATEGORIES.filter(c=>budgetOf(c.id)).forEach(c=>bud.push([T(c.name), M(budgetOf(c.id))]));
+  bud.push([{v:"Total", s:XL_HEAD}, {v:totalBudget, s:XL_BOLDMONEY}]);
+
+  const sheets = [
+    ["Expenses", xlSheet(exp, [12,26,26,12,26,40,8,14,12,16,30], true)],
+    ["By Month", xlSheet(mon, [12,14,14,14,16,16,22])],
+    ["By Category", xlSheet(cat, [12,30,14,14,14], true)],
+    ["Budgets", xlSheet(bud, [30,16])]
+  ];
+  const files = [
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map(([n],i)=>`<sheet name="${n}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}</sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'Expenses'!$A$1:$K$${exp.length}</definedName><definedName name="_xlnm._FilterDatabase" localSheetId="2" hidden="1">'By Category'!$A$1:$E$${cat.length}</definedName></definedNames></workbook>`],
+    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/><numFmt numFmtId="165" formatCode="mmm d, yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F2A5C"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+    ...sheets.map(([,xml],i)=>[`xl/worksheets/sheet${i+1}.xml`, xml])
+  ];
+  return zipStore(files);
+}
+/* Minimal zip writer (files stored uncompressed, which every spreadsheet app accepts) */
+const CRC_TABLE = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c = CRC_TABLE[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zipStore(files){
+  const enc = new TextEncoder(), parts = [], central = []; let offset = 0;
+  for(const [name, text] of files){
+    const nm = enc.encode(name), data = enc.encode(text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(8,0,true); h.setUint16(12,0x21,true);
+    h.setUint32(14,crc,true); h.setUint32(18,data.length,true); h.setUint32(22,data.length,true); h.setUint16(26,nm.length,true);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(14,0x21,true);
+    c.setUint32(16,crc,true); c.setUint32(20,data.length,true); c.setUint32(24,data.length,true); c.setUint16(28,nm.length,true); c.setUint32(42,offset,true);
+    parts.push(h, nm, data); central.push(c, nm);
+    offset += 30+nm.length+data.length;
+  }
+  const size = central.reduce((a,p)=>a+(p.byteLength),0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true);
+  end.setUint32(12,size,true); end.setUint32(16,offset,true);
+  return new Blob([...parts, ...central, end]);
+}
+
+/* ---------- Light / dark switch ---------- */
+const THEME_KEY = STORE_KEY+".theme";
+const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+function isDark(){ const t = document.documentElement.dataset.theme; return t ? t==="dark" : systemDark.matches; }
+function syncThemeUI(){
+  const dark = isDark();
+  document.documentElement.classList.toggle("is-dark", dark);
+  $("themeColor").content = dark ? "#000000" : "#f5f5f7";
+  $("themeBtn").setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+}
+function setTheme(t){
+  const apply = ()=>{
+    document.documentElement.dataset.theme = t;
+    try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
+    syncThemeUI();
+  };
+  if(!document.startViewTransition || reduceMotion.matches){ apply(); return; }
+  const r = $("themeBtn").getBoundingClientRect(), x = r.left+r.width/2, y = r.top+r.height/2;
+  const R = Math.hypot(Math.max(x, innerWidth-x), Math.max(y, innerHeight-y));
+  document.startViewTransition(apply).ready.then(()=>{
+    document.documentElement.animate(
+      {clipPath:[`circle(0px at ${x}px ${y}px)`, `circle(${R}px at ${x}px ${y}px)`]},
+      {duration:750, easing:"cubic-bezier(.28,.11,.32,1)", pseudoElement:"::view-transition-new(root)"});
+  }).catch(()=>{});
+}
+$("themeBtn").onclick = ()=>setTheme(isDark() ? "light" : "dark");
+systemDark.addEventListener("change", syncThemeUI);
+syncThemeUI();
+
 /* ---------- Toast ---------- */
 let toastT;
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400); }
 
 /* ---------- Boot ---------- */
 render();
+animateView();
 if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost")){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
