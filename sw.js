@@ -1,10 +1,15 @@
 // Offline support: caches the app files so it opens without internet.
 // Bump CACHE when you change any file so phones pick up the new version.
-const CACHE = "pocket-ledger-v4";
+const CACHE = "pocket-ledger-v6";
 const FILES = ["./", "./index.html", "./manifest.json", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache:"reload" skips the browser's own saved copies, so we never store an outdated file
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {
@@ -16,10 +21,11 @@ self.addEventListener("activate", (e) => {
 });
 
 // Network first (so updates show up), fall back to cache when offline.
+// cache:"no-cache" asks GitHub whether the file changed instead of reusing a stale copy.
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
+  if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: "no-cache" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
