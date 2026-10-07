@@ -715,42 +715,51 @@ let chartResizeT;
 window.addEventListener("resize", ()=>{ clearTimeout(chartResizeT); chartResizeT = setTimeout(()=>{ if(curView==="overview") renderOverview(); }, 150); });
 
 /* ---------- Sounds & haptics ----------
-   Sounds are synthesized on the fly (no audio files), kept quiet and short.
+   Sounds are synthesized on the fly (no audio files), kept soft, low and short.
    Haptics: Android uses vibration; iPhone (iOS 18+) gets the system tick from a hidden switch. */
 const PREF_SOUND = STORE_KEY+".sound", PREF_HAPTIC = STORE_KEY+".haptic";
 function pref(k){ try{ return localStorage.getItem(k)!=="off"; }catch(e){ return true; } }
-let actx = null, noiseBuf = null;
+/* "Pebble" sound set: round, low sine tones through a soft low-pass filter,
+   with a touch of room reverb. Nothing sharp or high-pitched. */
+let actx = null, master = null, verb = null;
 function audio(){
   if(!actx){
     const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null;
     try{ if(navigator.audioSession) navigator.audioSession.type = "ambient"; }catch(e){}  // respect the iPhone silent switch
     actx = new AC();
-    noiseBuf = actx.createBuffer(1, actx.sampleRate*0.03, actx.sampleRate);
-    const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/d.length, 3);
+    master = actx.createGain(); master.gain.value = .9;
+    const comp = actx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 3;
+    master.connect(comp).connect(actx.destination);
+    // a small, soft room: decaying noise used as the reverb's impulse
+    verb = actx.createConvolver();
+    const len = actx.sampleRate*1.2, ir = actx.createBuffer(2, len, actx.sampleRate);
+    for(let ch=0; ch<2; ch++){ const d = ir.getChannelData(ch); for(let i=0;i<len;i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/len, 4); }
+    verb.buffer = ir; verb.connect(master);
   }
   if(actx.state==="suspended") actx.resume();
   return actx;
 }
-function tone(ctx, f0, f1, at, dur, vol, type="sine"){
-  const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + at;
-  o.type = type; o.frequency.setValueAtTime(f0, t); if(f1!==f0) o.frequency.exponentialRampToValueAtTime(f1, t+dur);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t+0.006); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-  o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+dur+0.02);
-}
-function click(ctx, freq, vol){
-  const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-  src.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 1.2; g.gain.value = vol;
-  src.connect(f).connect(g).connect(ctx.destination); src.start();
+function voice({f, f1=f, at=0, dur=.15, vol=.1, lp=1800, wet=.12, attack=.008}){
+  const c = actx, t = c.currentTime + at + .01;
+  const o = c.createOscillator(), env = c.createGain(), filt = c.createBiquadFilter();
+  filt.type = "lowpass"; filt.frequency.value = lp; filt.Q.value = .5;
+  o.frequency.setValueAtTime(f, t); if(f1!==f) o.frequency.exponentialRampToValueAtTime(f1, t+dur);
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(vol, t+attack);
+  env.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(env).connect(filt).connect(master);
+  if(wet){ const w = c.createGain(); w.gain.value = wet; filt.connect(w).connect(verb); }
+  o.start(t); o.stop(t+dur+.05);
 }
 const SOUNDS = {
-  tap:    c=>click(c, 3200, .5),
-  tick:   c=>click(c, 4200, .18),
-  open:   c=>tone(c, 520, 880, 0, .16, .05),
-  close:  c=>tone(c, 760, 460, 0, .14, .04),
-  toggle: c=>{ tone(c, 900, 900, 0, .07, .045); tone(c, 1350, 1350, .06, .09, .04); },
-  success:c=>{ tone(c, 1046.5, 1046.5, 0, .22, .055); tone(c, 1568, 1568, .09, .38, .05); },
-  remove: c=>tone(c, 420, 110, 0, .22, .07),
-  error:  c=>{ tone(c, 240, 240, 0, .09, .06, "triangle"); tone(c, 200, 200, .12, .12, .06, "triangle"); }
+  tap:    ()=>voice({f:330, f1:290, dur:.11, vol:.16, lp:1200, wet:.06}),
+  tick:   ()=>voice({f:300, f1:280, dur:.05, vol:.05, lp:900, wet:0}),
+  open:   ()=>voice({f:262, f1:392, dur:.22, vol:.1, lp:1300, attack:.02}),
+  close:  ()=>voice({f:392, f1:262, dur:.2, vol:.09, lp:1200, attack:.015}),
+  toggle: ()=>{ voice({f:392, dur:.12, vol:.12, lp:1400}); voice({f:494, at:.07, dur:.16, vol:.11, lp:1400}); },
+  success:()=>{ voice({f:392, dur:.5, vol:.11, lp:1600, wet:.2}); voice({f:523.25, at:.09, dur:.55, vol:.1, lp:1600, wet:.2}); voice({f:659.25, at:.18, dur:.8, vol:.09, lp:1600, wet:.25}); },
+  remove: ()=>voice({f:247, f1:131, dur:.3, vol:.13, lp:900, wet:.1}),
+  error:  ()=>{ voice({f:196, dur:.14, vol:.13, lp:900}); voice({f:185, at:.16, dur:.18, vol:.12, lp:900}); }
 };
 const HAPTICS = { tap:8, tick:4, open:10, close:8, toggle:12, success:[12,60,18], remove:[20,40,10], error:[30,50,30] };
 function sfx(name){
