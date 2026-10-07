@@ -225,6 +225,29 @@ table.rates input{width:74px;padding:7px 9px;text-align:right;font-size:15px}
 .seg button.active{color:var(--ink)}
 .search{margin-bottom:12px}
 
+/* Statement scanner */
+.scanbtn{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 14px}
+.scanbtn svg{width:19px;height:19px}
+.sheetlink{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:4px 0 6px;color:var(--link);font:inherit;font-size:15px;cursor:pointer}
+.scanrow{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line);transition:opacity .3s var(--ease)}
+.scanrow:first-child{border-top:0}
+.scanrow.off .scanmain{opacity:.45}
+.scanmain{flex:1;min-width:0;display:grid;gap:8px;transition:opacity .3s var(--ease)}
+.scanline{display:grid;grid-template-columns:1fr 104px;gap:8px}
+.scanline.two{grid-template-columns:1fr 1fr}
+.scanmain input,.scanmain select{padding:9px 11px;font-size:15px;border-radius:10px}
+.scanmain .amt{text-align:right}
+.scannote{font-size:13px;color:var(--muted)}
+.check{appearance:none;-webkit-appearance:none;flex:none;width:26px;height:26px;margin:7px 0 0;padding:0;border-radius:50%;
+  border:2px solid var(--line);background:var(--surface);cursor:pointer;position:relative;transition:background .25s var(--ease),border-color .25s}
+.check:checked{background:var(--brand);border-color:var(--brand)}
+.check::after{content:"";position:absolute;left:7px;top:3px;width:6px;height:11px;border:solid #fff;border-width:0 2.5px 2.5px 0;
+  transform:rotate(45deg) scale(0);transition:transform .3s var(--spring)}
+.check:checked::after{transform:rotate(45deg) scale(1)}
+.check:focus{box-shadow:none}
+.scansum{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 4px}
+.scansum b{font-size:17px}
+
 /* Welcome: a two-tone headline, the way apple.com writes them */
 .greet{font:700 28px/1.18 -apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif;
   letter-spacing:-.022em;margin:18px 2px 24px;text-wrap:balance}
@@ -334,6 +357,7 @@ a:hover{text-decoration:underline}
   <!-- EXPENSES -->
   <section class="view" id="view-expenses">
     <input class="search" id="search" type="search" placeholder="Search merchant or note">
+    <button class="btn secondary scanbtn" id="scanOpen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 12h10"/></svg>Scan a statement screenshot</button>
     <div class="card"><div class="spread"><span class="sub">Total shown</span><b class="num" id="expTotal">$0</b></div></div>
     <div id="expList"></div>
   </section>
@@ -431,6 +455,7 @@ a:hover{text-decoration:underline}
 <div class="sheet" id="sheet" role="dialog" aria-modal="true">
   <div class="grab"></div>
   <h3 id="sheetTitle">Add expense</h3>
+  <button type="button" class="sheetlink" id="scanFromAdd">Or scan a statement screenshot</button>
   <form id="expForm" autocomplete="off">
     <input id="fAmount" class="amount-input num" type="text" inputmode="decimal" placeholder="$0.00" required>
     <label for="fMerchant">Merchant</label>
@@ -453,6 +478,26 @@ a:hover{text-decoration:underline}
     <button class="btn" type="submit" id="saveBtn" data-sfx="none">Save</button>
     <button class="btn danger" type="button" id="deleteBtn" data-sfx="none" hidden>Delete expense</button>
   </form>
+</div>
+
+<!-- Statement scanner -->
+<div class="sheet-bg" id="scanBg"></div>
+<div class="sheet" id="scanSheet" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+  <div class="grab"></div>
+  <h3 id="scanTitle">Scan a statement</h3>
+  <p class="sub" style="margin:0 0 4px">Screenshot the transactions in your card's app. Pocket Ledger reads them right here on this device and adds anything new. Expenses you already have are skipped.</p>
+  <label>Which card is this from?</label>
+  <div class="seg" id="scanCard">
+    <button type="button" data-c="csp" class="active" data-sfx="toggle">Sapphire</button>
+    <button type="button" data-c="savor" data-sfx="toggle">Savor</button>
+    <button type="button" data-c="othercard" data-sfx="toggle">Other</button>
+  </div>
+  <button class="btn" type="button" id="scanPick">Choose screenshots</button>
+  <input type="file" id="scanFile" accept="image/*" multiple hidden>
+  <div class="hint" id="scanStatus"></div>
+  <div class="bar" id="scanBar" hidden><i style="width:0"></i></div>
+  <div id="scanResults"></div>
+  <button class="btn" type="button" id="scanAdd" data-sfx="none" hidden>Add</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1059,7 +1104,11 @@ function openSheet(x){
 function closeSheet(){ $("sheet").classList.remove("open"); $("sheetBg").classList.remove("open"); document.activeElement?.blur(); }
 $("addBtn").onclick = ()=>openSheet(null);
 $("sheetBg").onclick = ()=>{ sfx("close"); closeSheet(); };
-document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("sheet").classList.contains("open")){ sfx("close"); closeSheet(); } });
+document.addEventListener("keydown", e=>{
+  if(e.key!=="Escape") return;
+  if($("scanSheet").classList.contains("open")){ sfx("close"); closeScan(); }
+  else if($("sheet").classList.contains("open")){ sfx("close"); closeSheet(); }
+});
 
 $("expForm").addEventListener("submit", e=>{
   e.preventDefault();
@@ -1088,6 +1137,271 @@ $("deleteBtn").onclick = ()=>{
   if(!editing || !confirm("Delete this expense?")) return;
   state.expenses[editing.id] = {...editing, deleted:true, updatedAt:now()};
   sfx("remove"); save(); closeSheet(); toast("Deleted"); render();
+};
+
+/* ---------- Statement scanner ----------
+   Reads screenshots of a card app's transaction list with on-device text recognition
+   (Tesseract), turns each row into an expense, and skips ones already logged.
+   The image never leaves the device; only the reader itself is downloaded on first use. */
+const OCR_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+let scanCardId = "csp", scanItems = [], ocrWorker = null, ocrProgress = ()=>{};
+
+function openScan(){
+  closeSheet();
+  scanItems = []; $("scanResults").innerHTML = ""; $("scanAdd").hidden = true; $("scanStatus").textContent = ""; $("scanBar").hidden = true;
+  let last = null; try{ last = localStorage.getItem(STORE_KEY+".lastCard"); }catch(e){}
+  setScanCard(DEFAULT_CARDS[last] ? last : "csp");
+  $("scanSheet").classList.add("open"); $("scanBg").classList.add("open");
+}
+function closeScan(){ $("scanSheet").classList.remove("open"); $("scanBg").classList.remove("open"); document.activeElement?.blur(); }
+function setScanCard(id){
+  scanCardId = id;
+  document.querySelectorAll("#scanCard button").forEach((b,i)=>{ b.classList.toggle("active", b.dataset.c===id); if(b.dataset.c===id) $("scanCard").style.setProperty("--i", i); });
+  scanItems.forEach(it=>{ it.card = id; it.earnKey = guessEarn(id, it.category, it.merchant); });
+}
+$("scanOpen").onclick = openScan;
+$("scanFromAdd").onclick = openScan;
+$("scanBg").onclick = ()=>{ sfx("close"); closeScan(); };
+$("scanCard").addEventListener("click", e=>{ const b = e.target.closest("button"); if(b) setScanCard(b.dataset.c); });
+$("scanPick").onclick = ()=>$("scanFile").click();
+$("scanFile").addEventListener("change", async e=>{
+  const files = [...e.target.files]; e.target.value = ""; if(!files.length) return;
+  const status = $("scanStatus"), bar = $("scanBar");
+  $("scanPick").disabled = true; bar.hidden = false; bar.firstElementChild.style.width = "0";
+  try{
+    status.textContent = "Getting the text reader ready…";
+    await loadOCR();
+    const found = [];   // one list per screenshot
+    for(let i=0; i<files.length; i++){
+      status.textContent = files.length>1 ? `Reading screenshot ${i+1} of ${files.length}…` : "Reading your screenshot…";
+      ocrProgress = p=>{ bar.firstElementChild.style.width = Math.round(((i+p)/files.length)*100)+"%"; };
+      const rows = await ocrRows(files[i]);
+      found.push(parseStatement(rows));
+    }
+    bar.firstElementChild.style.width = "100%";
+    showScanResults(found);
+  }catch(err){
+    console.warn(err); sfx("error");
+    status.textContent = err.message || "Couldn't read that screenshot. Try a clearer one.";
+  }finally{
+    $("scanPick").disabled = false; setTimeout(()=>{ bar.hidden = true; }, 500);
+  }
+});
+
+async function loadOCR(){
+  if(!window.Tesseract){
+    await new Promise((res, rej)=>{
+      const sc = document.createElement("script"); sc.src = OCR_URL; sc.onload = res;
+      sc.onerror = ()=>rej(new Error("Couldn't load the text reader. Check your internet connection and try again."));
+      document.head.appendChild(sc);
+    });
+  }
+  if(!ocrWorker){
+    ocrWorker = await Tesseract.createWorker("eng", 1, { logger: m=>{ if(m.status==="recognizing text") ocrProgress(m.progress||0); } });
+    await ocrWorker.setParameters({ tessedit_pageseg_mode: "11" });   // "sparse text": suits app screens with scattered labels
+  }
+}
+/* Clean the image up for reading: grayscale, flip dark-mode screenshots to dark-on-light,
+   then boost contrast so faint gray dates read as clearly as the bold merchant names */
+async function prepImage(file){
+  const bmp = await createImageBitmap(file);
+  const scale = bmp.width < 600 ? 2 : 1;
+  const c = document.createElement("canvas"); c.width = bmp.width*scale; c.height = bmp.height*scale;
+  const g = c.getContext("2d"); g.drawImage(bmp, 0, 0, c.width, c.height);
+  const img = g.getImageData(0, 0, c.width, c.height), d = img.data;
+  let sum = 0; for(let i=0; i<d.length; i+=4) sum += .299*d[i] + .587*d[i+1] + .114*d[i+2];
+  const invert = sum/(d.length/4) < 128;
+  for(let i=0; i<d.length; i+=4){
+    let v = .299*d[i] + .587*d[i+1] + .114*d[i+2]; if(invert) v = 255-v;
+    v = v > 200 ? 255 : Math.max(0, (v-40)*1.4);
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+/* Group recognized words into visual rows (merchant on the left, amount on the right) */
+async function ocrRows(file){
+  const { data } = await ocrWorker.recognize(await prepImage(file));
+  const words = (data.words || []).filter(w=>w.text.trim() && w.confidence > 30)
+    .map(w=>({ t:w.text.trim(), x:w.bbox.x0, cy:(w.bbox.y0+w.bbox.y1)/2, h:w.bbox.y1-w.bbox.y0 }))
+    .sort((a,b)=>a.cy-b.cy);
+  const rows = [];
+  for(const w of words){
+    const r = rows.find(r=>Math.abs(r.cy - w.cy) < Math.max(r.h, w.h)*0.55);
+    if(r){ r.words.push(w); r.cy = (r.cy + w.cy)/2; r.h = Math.max(r.h, w.h); } else rows.push({cy:w.cy, h:w.h, words:[w]});
+  }
+  return rows.sort((a,b)=>a.cy-b.cy).map(r=>r.words.sort((a,b)=>a.x-b.x).map(w=>w.t).join(" "));
+}
+
+const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const RE_WORDDATE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(\d{4}))?/i;
+const RE_NUMDATE = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/;
+const RE_RELDATE = /\b(today|yesterday)\b/i;
+const RE_AMOUNT = /([-+−–]\s?)?\$\s?((?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})\b/g;
+const RE_BAREAMT = /(?:^|\s)([-+−–]\s?)?((?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})\s*$/;
+const RE_NOTSPEND = /\b(payment|thank you|autopay|refund|return(ed)?|credit adj|statement credit|interest charge|cash back redemption)\b/i;
+const RE_SUMMARY = /\b(balance|available|credit limit|minimum|payment due|due date|statement|total|rewards|points|last statement|activity|transactions?)\b/i;
+
+function isoDate(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
+function parseRowDate(text){
+  const today = new Date();
+  let m = text.match(RE_RELDATE);
+  if(m){ const d = new Date(); if(/yesterday/i.test(m[1])) d.setDate(d.getDate()-1); return isoDate(d.getFullYear(), d.getMonth(), d.getDate()); }
+  let mon, day, yr;
+  if((m = text.match(RE_WORDDATE))){ mon = MONTHS[m[1].toLowerCase().slice(0,3)]; day = +m[2]; yr = m[3] ? +m[3] : null; }
+  else if((m = text.match(RE_NUMDATE))){ mon = +m[1]-1; day = +m[2]; yr = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : null; }
+  else return null;
+  if(mon<0 || mon>11 || day<1 || day>31) return null;
+  if(!yr){ yr = today.getFullYear(); if(new Date(yr, mon, day) > new Date(today.getTime()+2*864e5)) yr--; }
+  return isoDate(yr, mon, day);
+}
+function cleanMerchant(t){
+  t = t.replace(RE_AMOUNT, " ").replace(RE_BAREAMT, " ").replace(RE_WORDDATE, " ").replace(RE_NUMDATE, " ").replace(RE_RELDATE, " ")
+    .replace(/\bpending\b/ig, " ").replace(/[>›»•|©®™]/g, " ").replace(/\.{2,}\s?\d{4}\b/g, " ")
+    .replace(/^(sq|tst|sp|py|paypal|dd|pp)\s?\*\s?/i, "").replace(/\s*\*\s*/g, " ").replace(/\s+/g, " ").trim();
+  if(t === t.toUpperCase()) t = t.toLowerCase().replace(/\b([a-z])/g, c=>c.toUpperCase());
+  return t.slice(0, 40);
+}
+function rowAmount(row){
+  const amts = [...row.matchAll(RE_AMOUNT)];
+  if(amts.length){ const a = amts[amts.length-1]; return { sign:(a[1]||"").trim(), amt:a[2] }; }
+  const b = row.match(RE_BAREAMT); return b ? { sign:(b[1]||"").trim(), amt:b[2] } : null;
+}
+function parseStatement(rows){
+  const info = rows.map(row=>{
+    const a = rowAmount(row), date = parseRowDate(row);
+    const dateOnly = !a && date && cleanMerchant(row).replace(/[^a-z]/ig,"").length < 12;
+    return { row, a, date, dateOnly };
+  });
+  // Two layouts exist: dates as section headers above groups ("Oct 5, 2026"), or a small date
+  // under every transaction. If nearly every transaction has its own date line, it's the second kind.
+  const nAmt = info.filter(r=>r.a).length, nDate = info.filter(r=>r.dateOnly).length;
+  const perRowDates = nDate >= nAmt * 0.7;
+  const out = []; let headerDate = null;
+  info.forEach((r, i)=>{
+    if(r.dateOnly){
+      const prev = info[i-1];
+      if(!(prev && prev.a && (perRowDates || !headerDate))) headerDate = r.date;   // not a transaction's own date line
+      return;
+    }
+    if(!r.a) return;
+    const { sign, amt } = r.a;
+    if(sign || RE_NOTSPEND.test(r.row) || RE_SUMMARY.test(r.row)) return;   // payments, credits and summary lines
+    let merchant = cleanMerchant(r.row);
+    if(merchant.replace(/[^a-z]/ig,"").length < 2 && i>0 && !info[i-1].a && !info[i-1].dateOnly){
+      const above = info[i-1].row;
+      if(RE_SUMMARY.test(above) || RE_NOTSPEND.test(above)) return;   // e.g. "Current balance" with the number on its own line
+      merchant = cleanMerchant(above);
+    }
+    if(merchant.replace(/[^a-z]/ig,"").length < 2) return;
+    const next = info[i+1];
+    const ownDate = next && next.dateOnly && (perRowDates || !headerDate) ? next.date : null;
+    const amount = Math.round(parseFloat(amt.replace(/,/g,""))*100)/100;
+    if(!(amount>0)) return;
+    out.push({ merchant, amount, date: r.date || ownDate || headerDate || todayStr() });
+  });
+  return out;
+}
+
+/* Category: what you picked for this merchant before, otherwise a keyword guess */
+const CAT_WORDS = [
+  ["dining", /restaurant|pizza|cafe|coffee|starbucks|dunkin|mcdonald|burger|grill|kitchen|sushi|taco|chipotle|sweetgreen|doordash|grubhub|uber\s?eats|seamless|deli|bagel|bakery|shake shack|panera|chick|wendy|subway sandwich|domino|ramen|noodle|thai|bistro|diner|tavern|pub\b/i],
+  ["groceries", /trader joe|whole ?f(oo)?ds|safeway|kroger|grocery|supermarket|aldi|wegmans|stop ?& ?shop|key food|fairway|h ?mart|instacart|fresh ?direct|food bazaar|c-town|market/i],
+  ["transport", /\bmta\b|omny|\buber\b|lyft|transit|nyct|\bpath\b|citi ?bike|metrocard|nj transit|lirr|revel/i],
+  ["gas", /shell|exxon|mobil|\bbp\b|chevron|sunoco|speedway|\bgas\b|fuel|supercharg|chargepoint|evgo|electrify/i],
+  ["travel", /airline|airways|delta|united|jetblue|american air|southwest|spirit|frontier|hotel|marriott|hilton|hyatt|airbnb|vrbo|expedia|booking\.com|amtrak|parking|hertz|avis/i],
+  ["entertainment", /\bamc\b|regal|cinema|theat(er|re)|ticketmaster|stubhub|seatgeek|concert|museum|bowling|live nation|fandango/i],
+  ["streaming", /netflix|spotify|hulu|disney|hbo|\bmax\b|apple ?tv|youtube|peacock|paramount|prime video|audible|siriusxm/i],
+  ["bills", /verizon|at&t|t-mobile|con ?ed|electric|utilit|comcast|spectrum|xfinity|insurance|geico|state farm|icloud|google storage/i],
+  ["health", /cvs|walgreens|duane reade|pharmacy|\bgym\b|equinox|planet fitness|blink|crunch|peloton|doctor|dental|medical|clinic|optical/i],
+  ["personal", /salon|barber|\bspa\b|sephora|ulta|nail/i],
+  ["school", /bookstore|universit|college|tuition|chegg|textbook|pearson|mcgraw/i],
+  ["gifts", /donat|charity|gofundme|gift/i],
+  ["shopping", /amazon|amzn|target|walmart|best ?buy|apple\.com|apple store|uniqlo|zara|h&m|nike|etsy|ebay|costco|ikea|home depot|macy|nordstrom|tj ?maxx|marshalls/i]
+];
+const normMerchant = t=>String(t||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function guessCategory(merchant){
+  const n = normMerchant(merchant);
+  if(n.length >= 3){
+    const prev = liveExpenses().filter(x=>{ const m = normMerchant(x.merchant); return m && (m.startsWith(n.slice(0,6)) || n.startsWith(m.slice(0,6))); })
+      .sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+    if(prev) return prev.category;
+  }
+  const hit = CAT_WORDS.find(([, re])=>re.test(merchant));
+  return hit ? hit[0] : "other";
+}
+function guessEarn(cardId, cat, merchant){
+  if(!DEFAULT_CARDS[cardId]) return null;
+  if(cardId==="csp" && /lyft/i.test(merchant)) return "lyft";
+  return defaultEarnKey(cardId, cat);
+}
+function daysApart(a, b){ return Math.abs(new Date(a) - new Date(b)) / 864e5; }
+
+function showScanResults(groups){
+  // Overlapping screenshots repeat rows. Keep each purchase as many times as the most any single
+  // screenshot shows it, so two real $2.90 subway rides on one screen both survive.
+  const key = f=>f.amount+"|"+f.date+"|"+normMerchant(f.merchant);
+  const most = {};
+  groups.forEach(g=>{ const c = {}; g.forEach(f=>{ c[key(f)] = (c[key(f)]||0)+1; }); for(const k in c) most[k] = Math.max(most[k]||0, c[k]); });
+  const kept = {}, found = [];
+  groups.flat().forEach(f=>{ const k = key(f); if((kept[k]||0) < most[k]){ kept[k] = (kept[k]||0)+1; found.push(f); } });
+  // match against what's already logged; each existing expense can only match one row
+  const pool = liveExpenses().map(x=>({x, used:false}));
+  scanItems = found.map(f=>{
+    const cands = pool.filter(p=>!p.used && Math.abs(p.x.amount - f.amount) < .005 && daysApart(p.x.date, f.date) <= 3)
+      .sort((a,b)=>daysApart(a.x.date, f.date) - daysApart(b.x.date, f.date));
+    const dupe = cands[0]; if(dupe) dupe.used = true;
+    const category = dupe ? dupe.x.category : guessCategory(f.merchant);
+    return { ...f, category, card: scanCardId, earnKey: guessEarn(scanCardId, category, f.merchant), on: !dupe, dupeOf: dupe ? dupe.x : null };
+  });
+  const status = $("scanStatus");
+  if(!scanItems.length){
+    sfx("error");
+    status.textContent = "No transactions found. Try a screenshot that shows the list of purchases, with amounts.";
+    $("scanResults").innerHTML = ""; $("scanAdd").hidden = true; return;
+  }
+  const fresh = scanItems.filter(it=>it.on).length, dup = scanItems.length - fresh;
+  status.textContent = "";
+  const catOpts = CATEGORIES.map(c=>`<option value="${c.id}">${c.ic} ${c.name}</option>`).join("");
+  $("scanResults").innerHTML = `<div class="scansum"><b>${fresh} new</b><span class="sub">${dup ? `${dup} already in Pocket Ledger` : "Check the details, then add"}</span></div>`
+    + `<div>${scanItems.map((it,i)=>`<div class="scanrow ${it.on?"":"off"}" data-i="${i}">
+      <input type="checkbox" class="check" aria-label="Include" ${it.on?"checked":""}>
+      <div class="scanmain">
+        <div class="scanline"><input class="sm-m" value="${esc(it.merchant)}" aria-label="Merchant"><input class="sm-a amt num" inputmode="decimal" value="${it.amount.toFixed(2)}" aria-label="Amount"></div>
+        <div class="scanline two"><input class="sm-d" type="date" value="${it.date}" aria-label="Date"><select class="sm-c" aria-label="Category">${catOpts}</select></div>
+        ${it.dupeOf ? `<div class="scannote">Already added as ${esc(it.dupeOf.merchant || catById[it.dupeOf.category]?.name || "an expense")} ${(d=>/^(Today|Yesterday)$/.test(d) ? d.toLowerCase() : "on "+d)(dayLabel(it.dupeOf.date))}</div>` : ""}
+      </div></div>`).join("")}</div>`;
+  $("scanResults").querySelectorAll(".scanrow").forEach(r=>{ r.querySelector(".sm-c").value = scanItems[+r.dataset.i].category; });
+  updateScanAdd();
+  sfx(fresh ? "success" : "tap");
+}
+function updateScanAdd(){
+  const n = scanItems.filter(it=>it.on).length, btn = $("scanAdd");
+  btn.hidden = false; btn.disabled = !n;
+  btn.textContent = n ? `Add ${n} expense${n===1?"":"s"}` : "Nothing new to add";
+}
+$("scanResults").addEventListener("change", e=>{
+  const r = e.target.closest(".scanrow"); if(!r) return;
+  const it = scanItems[+r.dataset.i];
+  if(e.target.classList.contains("check")){ it.on = e.target.checked; r.classList.toggle("off", !it.on); updateScanAdd(); return; }
+  if(e.target.classList.contains("sm-m")) it.merchant = e.target.value.trim();
+  if(e.target.classList.contains("sm-a")) it.amount = parseAmount(e.target.value);
+  if(e.target.classList.contains("sm-d")) it.date = e.target.value;
+  if(e.target.classList.contains("sm-c")){ it.category = e.target.value; it.earnKey = guessEarn(it.card, it.category, it.merchant); }
+});
+$("scanAdd").onclick = ()=>{
+  const add = scanItems.filter(it=>it.on);
+  if(add.some(it=>!(it.amount>0) || !it.date)){ sfx("error"); toast("Check the amounts and dates"); return; }
+  add.forEach(it=>{
+    const earn = it.earnKey ? earnOf(it.card, it.earnKey) : null;
+    const x = { id:uid(), amount:it.amount, date:it.date, category:it.category, card:it.card,
+      earnKey: earn ? earn.key : null, rate: earn ? earn.rate : 0, merchant:it.merchant, note:"",
+      createdAt:now(), updatedAt:now(), deleted:false, source:"scan" };
+    state.expenses[x.id] = x;
+  });
+  save(); sfx("success"); closeScan();
+  toast(`Added ${add.length} expense${add.length===1?"":"s"}`);
+  render();
 };
 
 /* ---------- Export / Import (merge) ---------- */
